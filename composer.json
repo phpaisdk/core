@@ -1,9 +1,19 @@
 {
     "name": "aisdk/core",
-    "description": "Framework-agnostic PHP AI SDK",
-    "keywords": ["aisdk", "ai", "llm", "openai", "anthropic"],
-    "homepage": "https://github.com/phpaisdk/core",
+    "description": "Framework-agnostic PHP AI SDK.",
     "license": "MIT",
+    "keywords": [
+        "ai",
+        "aisdk",
+        "anthropic",
+        "llm",
+        "openai"
+    ],
+    "homepage": "https://github.com/phpaisdk/core",
+    "support": {
+        "issues": "https://github.com/phpaisdk/core/issues",
+        "source": "https://github.com/phpaisdk/core"
+    },
     "authors": [
         {
             "name": "Moiz Haider",
@@ -28,6 +38,8 @@
         "phpstan/phpstan": "^2.0",
         "rector/rector": "^2.0"
     },
+    "minimum-stability": "alpha",
+    "prefer-stable": true,
     "autoload": {
         "psr-4": {
             "AiSdk\\": "src/"
@@ -57,7 +69,5 @@
             "pestphp/pest-plugin": true,
             "php-http/discovery": true
         }
-    },
-    "minimum-stability": "alpha",
-    "prefer-stable": true
+    }
 }
