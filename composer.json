@@ -1,0 +1,63 @@
+{
+    "name": "aisdk/core",
+    "description": "Framework-agnostic PHP AI SDK",
+    "keywords": ["aisdk", "ai", "llm", "openai", "anthropic"],
+    "homepage": "https://github.com/phpaisdk/core",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Moiz Haider",
+            "email": "hi@moizhaider.com",
+            "role": "Developer"
+        }
+    ],
+    "require": {
+        "php": "^8.3",
+        "php-http/discovery": "^1.19",
+        "psr/container": "^2.0",
+        "psr/http-client": "^1.0",
+        "psr/http-factory": "^1.1",
+        "psr/http-message": "^2.0",
+        "psr/log": "^3.0",
+        "psr/simple-cache": "^3.0"
+    },
+    "require-dev": {
+        "laravel/pint": "^1.18",
+        "nyholm/psr7": "^1.8",
+        "pestphp/pest": "^3.0 || ^4.0",
+        "phpstan/phpstan": "^2.0",
+        "rector/rector": "^2.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "AiSdk\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "AiSdk\\Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "lint": "vendor/bin/pint --test",
+        "format": "vendor/bin/pint",
+        "analyze": "vendor/bin/phpstan analyze --memory-limit=512M",
+        "refactor:dry": "vendor/bin/rector process --dry-run",
+        "refactor": "vendor/bin/rector process",
+        "test": "pest",
+        "test:all": [
+            "@lint",
+            "@analyze",
+            "@test"
+        ]
+    },
+    "config": {
+        "sort-packages": true,
+        "allow-plugins": {
+            "pestphp/pest-plugin": true,
+            "php-http/discovery": true
+        }
+    },
+    "minimum-stability": "alpha",
+    "prefer-stable": true
+}

@@ -1,0 +1,9 @@
+parameters:
+    level: 8
+    paths:
+        - src
+    ignoreErrors:
+        -
+            identifier: trait.unused
+            path: src/Support/Concerns/RegistersModels.php
+    treatPhpDocTypesAsCertain: false
