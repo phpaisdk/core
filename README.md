@@ -31,26 +31,6 @@ Generate::model(OpenAI::model('gpt-4o'));
 $result = Generate::text('Explain closures in PHP.')->run();
 ```
 
-## Configuration
-
-Core provides a fluent SDK factory for PSR-18/17/3/11 collaborators:
-
-```php
-use AiSdk\Generate;
-use AiSdk\Support\SdkFactory;
-
-Generate::configure(
-    (new SdkFactory())
-        ->withHttpClient(new MyHttpClient())
-        ->withRequestFactory(new MyRequestFactory())
-        ->withLogger(new MyLogger())
-        ->withContainer(new MyContainer())
-        ->make()
-);
-```
-
-If no SDK is configured, core uses `php-http/discovery` to auto-resolve PSR implementations.
-
 ## Structured Output
 
 ```php
