@@ -15,6 +15,7 @@ enum Capability
     case ToolCalling;
     case StructuredOutput;
     case Reasoning;
+    case ImageGeneration;
     case TextInput;
     case ImageInput;
     case AudioInput;
@@ -28,6 +29,7 @@ enum Capability
             'tool_calling' => self::ToolCalling,
             'structured_output' => self::StructuredOutput,
             'reasoning' => self::Reasoning,
+            'image_generation' => self::ImageGeneration,
             'text_input' => self::TextInput,
             'image_input', 'vision' => self::ImageInput,
             'audio_input' => self::AudioInput,
@@ -44,6 +46,7 @@ enum Capability
             self::ToolCalling => 'tool_calling',
             self::StructuredOutput => 'structured_output',
             self::Reasoning => 'reasoning',
+            self::ImageGeneration => 'image_generation',
             self::TextInput => 'text_input',
             self::ImageInput => 'image_input',
             self::AudioInput => 'audio_input',

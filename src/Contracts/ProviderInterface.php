@@ -13,4 +13,6 @@ interface ProviderInterface
     public function name(): string;
 
     public function textModel(string $modelId): TextModelInterface;
+
+    public function imageModel(string $modelId): ImageModelInterface;
 }

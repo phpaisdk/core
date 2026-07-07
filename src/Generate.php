@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace AiSdk;
 
 use AiSdk\Contracts\Model;
+use AiSdk\Contracts\ImageModelInterface;
 use AiSdk\Contracts\TextModelInterface;
+use AiSdk\Support\PendingImageRequest;
 use AiSdk\Support\PendingTextRequest;
 use AiSdk\Support\Sdk;
 use AiSdk\Support\SdkFactory;
@@ -56,6 +58,13 @@ final class Generate
         return $prompt === null ? $request : $request->prompt($prompt);
     }
 
+    public static function image(?string $prompt = null): PendingImageRequest
+    {
+        $request = new PendingImageRequest(self::defaultImageModel());
+
+        return $prompt === null ? $request : $request->prompt($prompt);
+    }
+
     private static function runtimeFactory(): SdkFactory
     {
         return self::$runtimeFactory ??= self::factory();
@@ -68,5 +77,14 @@ final class Generate
             : self::$runtimeFactory?->defaultModel();
 
         return $model instanceof TextModelInterface ? $model : null;
+    }
+
+    private static function defaultImageModel(): ?ImageModelInterface
+    {
+        $model = self::$sdk !== null
+            ? self::$sdk->defaultModel
+            : self::$runtimeFactory?->defaultModel();
+
+        return $model instanceof ImageModelInterface ? $model : null;
     }
 }

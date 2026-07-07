@@ -28,6 +28,11 @@ abstract class BaseProvider implements ProviderInterface
         throw NoSuchModelException::for($this->name(), $modelId, 'textModel');
     }
 
+    public function imageModel(string $modelId): ImageModelInterface
+    {
+        throw NoSuchModelException::for($this->name(), $modelId, 'imageModel');
+    }
+
     /**
      * @param  ModelDefinition|string  $model
      * @param  array<int, Capability>  $capabilities
