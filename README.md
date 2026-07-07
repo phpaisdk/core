@@ -117,6 +117,35 @@ $stream->onChunk(fn (string $text) => log($text))
     ->onError(fn (\Throwable $e) => log($e));
 ```
 
+## Image Generation
+
+```php
+use AiSdk\Generate;
+use AiSdk\OpenAI;
+
+$result = Generate::image()
+    ->model(OpenAI::image('gpt-image-1'))
+    ->prompt('A clean app icon for a PHP AI SDK')
+    ->size('1024x1024')
+    ->run();
+
+$result->output->save(__DIR__.'/icon.png');
+```
+
+Generate multiple images or use portable image options:
+
+```php
+$result = Generate::image('Minimal line art of Lahore Fort')
+    ->model(OpenAI::image('gpt-image-1'))
+    ->count(2)
+    ->aspectRatio('1:1')
+    ->run();
+
+foreach ($result->images as $index => $image) {
+    $image->save(__DIR__."/image-{$index}.png");
+}
+```
+
 ## Custom Model Registration
 
 Register new models at runtime without waiting for a package release:
@@ -144,6 +173,7 @@ Unknown unregistered model IDs are allowed for text generation. The provider API
 
 - Text generation (`Generate::text()`)
 - Streaming text generation (`->stream()`)
+- Image generation (`Generate::image()`)
 - Tool calling (`->tool(...)`)
 - Structured output (`->output(...)`)
 - Provider options passthrough (`->providerOptions(...)`)
