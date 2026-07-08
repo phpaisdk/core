@@ -33,6 +33,11 @@ abstract class BaseProvider implements ProviderInterface
         throw NoSuchModelException::for($this->name(), $modelId, 'imageModel');
     }
 
+    public function speechModel(string $modelId): SpeechModelInterface
+    {
+        throw NoSuchModelException::for($this->name(), $modelId, 'speechModel');
+    }
+
     /**
      * @param  ModelDefinition|string  $model
      * @param  array<int, Capability>  $capabilities

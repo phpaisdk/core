@@ -146,6 +146,33 @@ foreach ($result->images as $index => $image) {
 }
 ```
 
+## Speech Generation
+
+```php
+use AiSdk\Generate;
+use AiSdk\OpenAI;
+
+$result = Generate::speech()
+    ->model(OpenAI::speech('gpt-4o-mini-tts'))
+    ->input('Welcome to the PHP AI SDK.')
+    ->voice('coral')
+    ->format('mp3')
+    ->run();
+
+$result->output->save(__DIR__.'/welcome.mp3');
+```
+
+The portable speech surface supports `input()`, `voice()`, `format()`, and provider-specific options:
+
+```php
+$result = Generate::speech('Read this in a warm tone.')
+    ->model(OpenAI::speech('gpt-4o-mini-tts'))
+    ->providerOptions('openai', [
+        'instructions' => 'Speak clearly and warmly.',
+    ])
+    ->run();
+```
+
 ## Custom Model Registration
 
 Register new models at runtime without waiting for a package release:
@@ -174,6 +201,7 @@ Unknown unregistered model IDs are allowed for text generation. The provider API
 - Text generation (`Generate::text()`)
 - Streaming text generation (`->stream()`)
 - Image generation (`Generate::image()`)
+- Speech generation (`Generate::speech()`)
 - Tool calling (`->tool(...)`)
 - Structured output (`->output(...)`)
 - Provider options passthrough (`->providerOptions(...)`)

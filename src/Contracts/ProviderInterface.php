@@ -15,4 +15,6 @@ interface ProviderInterface
     public function textModel(string $modelId): TextModelInterface;
 
     public function imageModel(string $modelId): ImageModelInterface;
+
+    public function speechModel(string $modelId): SpeechModelInterface;
 }

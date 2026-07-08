@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace AiSdk;
 
-use AiSdk\Contracts\Model;
 use AiSdk\Contracts\ImageModelInterface;
+use AiSdk\Contracts\Model;
+use AiSdk\Contracts\SpeechModelInterface;
 use AiSdk\Contracts\TextModelInterface;
 use AiSdk\Support\PendingImageRequest;
+use AiSdk\Support\PendingSpeechRequest;
 use AiSdk\Support\PendingTextRequest;
 use AiSdk\Support\Sdk;
 use AiSdk\Support\SdkFactory;
@@ -65,6 +67,13 @@ final class Generate
         return $prompt === null ? $request : $request->prompt($prompt);
     }
 
+    public static function speech(?string $input = null): PendingSpeechRequest
+    {
+        $request = new PendingSpeechRequest(self::defaultSpeechModel());
+
+        return $input === null ? $request : $request->input($input);
+    }
+
     private static function runtimeFactory(): SdkFactory
     {
         return self::$runtimeFactory ??= self::factory();
@@ -86,5 +95,14 @@ final class Generate
             : self::$runtimeFactory?->defaultModel();
 
         return $model instanceof ImageModelInterface ? $model : null;
+    }
+
+    private static function defaultSpeechModel(): ?SpeechModelInterface
+    {
+        $model = self::$sdk !== null
+            ? self::$sdk->defaultModel
+            : self::$runtimeFactory?->defaultModel();
+
+        return $model instanceof SpeechModelInterface ? $model : null;
     }
 }

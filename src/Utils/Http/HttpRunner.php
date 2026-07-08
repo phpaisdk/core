@@ -56,6 +56,18 @@ final class HttpRunner
     /**
      * @param  array<string, mixed>  $body
      * @param  array<string, string>  $headers
+     */
+    public function postRaw(string $url, array $body, array $headers = [], string $provider = 'provider'): ResponseInterface
+    {
+        $response = $this->send($this->prepareJson('POST', $url, $body, $headers));
+        $this->ensureSuccess($response, $provider);
+
+        return $response;
+    }
+
+    /**
+     * @param  array<string, mixed>  $body
+     * @param  array<string, string>  $headers
      * @return Generator<int, array{event: ?string, data: string}>
      */
     public function postStream(string $url, array $body, array $headers = [], string $provider = 'provider'): Generator
