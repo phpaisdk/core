@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace AiSdk;
 
+use AiSdk\Contracts\EmbeddingModelInterface;
 use AiSdk\Contracts\ImageModelInterface;
 use AiSdk\Contracts\Model;
 use AiSdk\Contracts\SpeechModelInterface;
 use AiSdk\Contracts\TextModelInterface;
+use AiSdk\Support\PendingEmbeddingRequest;
 use AiSdk\Support\PendingImageRequest;
 use AiSdk\Support\PendingSpeechRequest;
 use AiSdk\Support\PendingTextRequest;
@@ -74,6 +76,16 @@ final class Generate
         return $input === null ? $request : $request->input($input);
     }
 
+    /**
+     * @param  string|array<int, string>|null  $input
+     */
+    public static function embedding(string|array|null $input = null): PendingEmbeddingRequest
+    {
+        $request = new PendingEmbeddingRequest(self::defaultEmbeddingModel());
+
+        return $input === null ? $request : $request->input($input);
+    }
+
     private static function runtimeFactory(): SdkFactory
     {
         return self::$runtimeFactory ??= self::factory();
@@ -104,5 +116,14 @@ final class Generate
             : self::$runtimeFactory?->defaultSpeechModel() ?? self::$runtimeFactory?->defaultModel();
 
         return $model instanceof SpeechModelInterface ? $model : null;
+    }
+
+    private static function defaultEmbeddingModel(): ?EmbeddingModelInterface
+    {
+        $model = self::$sdk !== null
+            ? self::$sdk->defaultEmbeddingModel ?? self::$sdk->defaultModel
+            : self::$runtimeFactory?->defaultEmbeddingModel() ?? self::$runtimeFactory?->defaultModel();
+
+        return $model instanceof EmbeddingModelInterface ? $model : null;
     }
 }

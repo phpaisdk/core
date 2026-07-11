@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace AiSdk\Support;
 
+use AiSdk\Contracts\EmbeddingModelInterface;
 use AiSdk\Contracts\ImageModelInterface;
 use AiSdk\Contracts\Model;
 use AiSdk\Contracts\SpeechModelInterface;
@@ -32,6 +33,7 @@ final class SdkFactory
     private ?TextModelInterface $defaultTextModel = null;
     private ?ImageModelInterface $defaultImageModel = null;
     private ?SpeechModelInterface $defaultSpeechModel = null;
+    private ?EmbeddingModelInterface $defaultEmbeddingModel = null;
     private float $connectTimeout = 10.0;
     private float $timeout = 120.0;
 
@@ -112,6 +114,9 @@ final class SdkFactory
         if ($model instanceof SpeechModelInterface) {
             $this->defaultSpeechModel = $model;
         }
+        if ($model instanceof EmbeddingModelInterface) {
+            $this->defaultEmbeddingModel = $model;
+        }
 
         return $this;
     }
@@ -127,6 +132,11 @@ final class SdkFactory
     }
 
     public function withDefaultSpeechModel(SpeechModelInterface $model): self
+    {
+        return $this->withDefaultModel($model);
+    }
+
+    public function withDefaultEmbeddingModel(EmbeddingModelInterface $model): self
     {
         return $this->withDefaultModel($model);
     }
@@ -151,6 +161,11 @@ final class SdkFactory
         return $this->defaultSpeechModel;
     }
 
+    public function defaultEmbeddingModel(): ?EmbeddingModelInterface
+    {
+        return $this->defaultEmbeddingModel;
+    }
+
     public function make(): Sdk
     {
         return new Sdk(
@@ -168,6 +183,7 @@ final class SdkFactory
             defaultTextModel: $this->defaultTextModel,
             defaultImageModel: $this->defaultImageModel,
             defaultSpeechModel: $this->defaultSpeechModel,
+            defaultEmbeddingModel: $this->defaultEmbeddingModel,
         );
     }
 }

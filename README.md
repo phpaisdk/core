@@ -196,6 +196,28 @@ $result = Generate::speech('Read this in a warm tone.')
     ->run();
 ```
 
+## Embeddings
+
+Generate one vector or a batch of vectors through the same text-only API:
+
+```php
+use AiSdk\Generate;
+use AiSdk\OpenAI;
+
+$result = Generate::embedding([
+        'First document',
+        'Second document',
+    ])
+    ->model(OpenAI::embedding('text-embedding-3-small'))
+    ->dimensions(512)
+    ->run();
+
+$firstVector = $result->output->vector;
+$allVectors = $result->embeddings;
+```
+
+`dimensions()` is the only portable embedding option. Provider-specific fields such as retrieval task type or truncation can be sent with `providerOptions()` using the provider package's documented field names.
+
 ## Model IDs and Capabilities
 
 Model IDs are opaque provider values. Packages do not ship model inventories, so new, private, routed, deployed, and locally installed models can be used without waiting for an SDK release:
@@ -216,6 +238,7 @@ Providers whose available models depend on the current account, region, or local
 - Streaming text generation (`->stream()`)
 - Image generation (`Generate::image()`)
 - Speech generation (`Generate::speech()`)
+- Text embeddings (`Generate::embedding()`)
 - Tool calling (`->tool(...)`)
 - Structured output (`->output(...)`)
 - Provider options passthrough (`->providerOptions(...)`)
@@ -240,6 +263,8 @@ $result = Generate::text('Hi')
 
 expect($result->text)->toBe('Hello!');
 ```
+
+Embedding tests can use `AiSdk\Testing\Fakes\FakeEmbeddingModel` in the same way.
 
 ## Links
 

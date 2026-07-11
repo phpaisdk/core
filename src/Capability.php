@@ -17,6 +17,7 @@ enum Capability
     case Reasoning;
     case ImageGeneration;
     case SpeechGeneration;
+    case Embedding;
     case TextInput;
     case ImageInput;
     case AudioInput;
@@ -32,6 +33,7 @@ enum Capability
             'reasoning' => self::Reasoning,
             'image_generation' => self::ImageGeneration,
             'speech_generation', 'text_to_speech' => self::SpeechGeneration,
+            'embedding', 'embeddings' => self::Embedding,
             'text_input' => self::TextInput,
             'image_input', 'vision' => self::ImageInput,
             'audio_input' => self::AudioInput,
@@ -50,6 +52,7 @@ enum Capability
             self::Reasoning => 'reasoning',
             self::ImageGeneration => 'image_generation',
             self::SpeechGeneration => 'speech_generation',
+            self::Embedding => 'embedding',
             self::TextInput => 'text_input',
             self::ImageInput => 'image_input',
             self::AudioInput => 'audio_input',

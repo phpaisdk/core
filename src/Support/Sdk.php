@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace AiSdk\Support;
 
+use AiSdk\Contracts\EmbeddingModelInterface;
 use AiSdk\Contracts\ImageModelInterface;
 use AiSdk\Contracts\Model;
 use AiSdk\Contracts\SpeechModelInterface;
@@ -31,6 +32,7 @@ final class Sdk
         public readonly ?TextModelInterface $defaultTextModel = null,
         public readonly ?ImageModelInterface $defaultImageModel = null,
         public readonly ?SpeechModelInterface $defaultSpeechModel = null,
+        public readonly ?EmbeddingModelInterface $defaultEmbeddingModel = null,
     ) {}
 
     public function withDefaultModel(Model $model): self
@@ -46,6 +48,7 @@ final class Sdk
             defaultTextModel: $model instanceof TextModelInterface ? $model : $this->defaultTextModel,
             defaultImageModel: $model instanceof ImageModelInterface ? $model : $this->defaultImageModel,
             defaultSpeechModel: $model instanceof SpeechModelInterface ? $model : $this->defaultSpeechModel,
+            defaultEmbeddingModel: $model instanceof EmbeddingModelInterface ? $model : $this->defaultEmbeddingModel,
         );
     }
 
@@ -60,6 +63,11 @@ final class Sdk
     }
 
     public function withDefaultSpeechModel(SpeechModelInterface $model): self
+    {
+        return $this->withDefaultModel($model);
+    }
+
+    public function withDefaultEmbeddingModel(EmbeddingModelInterface $model): self
     {
         return $this->withDefaultModel($model);
     }
@@ -81,6 +89,16 @@ final class Sdk
     public function speech(?string $input = null): PendingSpeechRequest
     {
         $request = new PendingSpeechRequest($this->defaultSpeechModel);
+
+        return $input === null ? $request : $request->input($input);
+    }
+
+    /**
+     * @param  string|array<int, string>|null  $input
+     */
+    public function embedding(string|array|null $input = null): PendingEmbeddingRequest
+    {
+        $request = new PendingEmbeddingRequest($this->defaultEmbeddingModel);
 
         return $input === null ? $request : $request->input($input);
     }

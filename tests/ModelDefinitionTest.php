@@ -20,7 +20,7 @@ it('constructs model information returned by provider discovery', function () {
 it('builds model information from runtime discovery data', function () {
     $model = ModelDefinition::fromArray([
         'id' => 'local-model',
-        'capabilities' => ['text_generation', 'streaming', 'image_input'],
+        'capabilities' => ['text_generation', 'streaming', 'image_input', 'embeddings'],
         'adapted_capabilities' => [
             'structured_output' => ['strategy' => 'response format'],
         ],
@@ -32,6 +32,7 @@ it('builds model information from runtime discovery data', function () {
         Capability::TextGeneration,
         Capability::Streaming,
         Capability::ImageInput,
+        Capability::Embedding,
     ])->and($model->adaptedCapabilities)->toBe([
         'structured_output' => ['strategy' => 'response format'],
     ])->and($model->metadata['status'])->toBe('available')

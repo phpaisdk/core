@@ -5,6 +5,7 @@ declare(strict_types=1);
 use AiSdk\Content;
 use AiSdk\Exceptions\InvalidArgumentException;
 use AiSdk\Generate;
+use AiSdk\Tests\Fakes\FakeEmbeddingModel;
 use AiSdk\Tests\Fakes\FakeImageModel;
 use AiSdk\Tests\Fakes\FakeTextModel;
 
@@ -29,9 +30,11 @@ it('uses the configured default model', function () {
 it('keeps defaults for different modalities independently', function () {
     Generate::model(FakeTextModel::text('default text'));
     Generate::model(FakeImageModel::image('aW1hZ2U='));
+    Generate::model(FakeEmbeddingModel::embedding([0.4, 0.5]));
 
     expect(Generate::text('Hello')->run()->text)->toBe('default text')
-        ->and(Generate::image('Draw')->run()->output->base64)->toBe('aW1hZ2U=');
+        ->and(Generate::image('Draw')->run()->output->base64)->toBe('aW1hZ2U=')
+        ->and(Generate::embedding('Embed')->run()->output->vector)->toBe([0.4, 0.5]);
 });
 
 it('requires a prompt or messages', function () {

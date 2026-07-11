@@ -9,6 +9,7 @@ use AiSdk\Streaming\Stream;
 use AiSdk\Streaming\TextDeltaPart;
 use AiSdk\Support\Sdk;
 use AiSdk\Support\Usage;
+use AiSdk\Testing\Fakes\FakeEmbeddingModel;
 use AiSdk\Testing\Fakes\FakeTextModel;
 use AiSdk\Utils\Http\HttpRunner;
 use GuzzleHttp\Client;
@@ -116,5 +117,7 @@ it('supports provider discovery through json get requests', function () {
 
 it('ships consumer autoloadable testing fakes', function () {
     expect(class_exists(FakeTextModel::class))->toBeTrue()
-        ->and(FakeTextModel::text('ok')->modelId())->toBe('fake-text-1');
+        ->and(FakeTextModel::text('ok')->modelId())->toBe('fake-text-1')
+        ->and(class_exists(FakeEmbeddingModel::class))->toBeTrue()
+        ->and(FakeEmbeddingModel::embedding()->modelId())->toBe('fake-embedding-1');
 });

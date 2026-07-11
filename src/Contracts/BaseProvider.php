@@ -30,4 +30,9 @@ abstract class BaseProvider implements ProviderInterface
         throw NoSuchModelException::for($this->name(), $modelId, 'speechModel');
     }
 
+    public function embeddingModel(string $modelId): EmbeddingModelInterface
+    {
+        throw NoSuchModelException::for($this->name(), $modelId, 'embeddingModel');
+    }
+
 }
