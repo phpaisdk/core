@@ -54,7 +54,7 @@
         "analyze": "vendor/bin/phpstan analyze --memory-limit=512M",
         "refactor:dry": "vendor/bin/rector process --dry-run",
         "refactor": "vendor/bin/rector process",
-        "test": "pest",
+        "test": "vendor/bin/pest",
         "test:all": [
             "@lint",
             "@analyze",
