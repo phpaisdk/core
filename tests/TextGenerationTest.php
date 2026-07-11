@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-use AiSdk\Capability;
 use AiSdk\Content;
 use AiSdk\Exceptions\InvalidArgumentException;
 use AiSdk\Generate;
+use AiSdk\Tests\Fakes\FakeImageModel;
 use AiSdk\Tests\Fakes\FakeTextModel;
 
 afterEach(fn() => Generate::reset());
@@ -26,6 +26,14 @@ it('uses the configured default model', function () {
     expect(Generate::text('Hello')->run()->text)->toBe('default reply');
 });
 
+it('keeps defaults for different modalities independently', function () {
+    Generate::model(FakeTextModel::text('default text'));
+    Generate::model(FakeImageModel::image('aW1hZ2U='));
+
+    expect(Generate::text('Hello')->run()->text)->toBe('default text')
+        ->and(Generate::image('Draw')->run()->output->base64)->toBe('aW1hZ2U=');
+});
+
 it('requires a prompt or messages', function () {
     Generate::text()
         ->model(FakeTextModel::text('x'))
@@ -36,19 +44,7 @@ it('requires a text model', function () {
     Generate::text('Hello')->run();
 })->throws(InvalidArgumentException::class);
 
-it('checks typed input capabilities before running the provider', function () {
-    Generate::text()
-        ->messages([
-            \AiSdk\Message::user([
-                Content::text('Describe this.'),
-                Content::image('raw-image', mimeType: 'image/png'),
-            ]),
-        ])
-        ->model(FakeTextModel::text('nope'))
-        ->run();
-})->throws(\AiSdk\Exceptions\CapabilityNotSupportedException::class);
-
-it('allows typed input when the model advertises that input capability', function () {
+it('forwards typed input to the selected provider adapter', function () {
     $result = Generate::text()
         ->messages([
             \AiSdk\Message::user([
@@ -56,7 +52,7 @@ it('allows typed input when the model advertises that input capability', functio
                 Content::image('raw-image', mimeType: 'image/png'),
             ]),
         ])
-        ->model(FakeTextModel::textWithCapabilities('ok', [Capability::ImageInput]))
+        ->model(FakeTextModel::text('ok'))
         ->run();
 
     expect($result->text)->toBe('ok');

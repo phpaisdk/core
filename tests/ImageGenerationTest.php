@@ -45,12 +45,6 @@ it('requires an image model', function () {
     Generate::image('A red cube')->run();
 })->throws(\AiSdk\Exceptions\InvalidArgumentException::class);
 
-it('requires image generation capability', function () {
-    Generate::image('A red cube')
-        ->model(FakeImageModel::withoutImageGeneration())
-        ->run();
-})->throws(\AiSdk\Exceptions\CapabilityNotSupportedException::class);
-
 it('decodes and saves image data', function () {
     $image = Generate::image('A red cube')
         ->model(FakeImageModel::image(base64_encode('png-bytes')))

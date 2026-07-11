@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace AiSdk\Support;
 
+use AiSdk\Contracts\ImageModelInterface;
 use AiSdk\Contracts\Model;
+use AiSdk\Contracts\SpeechModelInterface;
+use AiSdk\Contracts\TextModelInterface;
+use GuzzleHttp\Client;
 use Http\Discovery\Psr17FactoryDiscovery;
-use Http\Discovery\Psr18ClientDiscovery;
 use Psr\Container\ContainerInterface;
 use Psr\Http\Client\ClientInterface;
 use Psr\Http\Message\RequestFactoryInterface;
@@ -14,8 +17,8 @@ use Psr\Http\Message\StreamFactoryInterface;
 use Psr\Log\LoggerInterface;
 
 /**
- * Fluent builder for an {@see Sdk}. Mirrors the with*()/make() pattern from
- * the reference API clients. PSR collaborators are auto-discovered if unset.
+ * Fluent builder for an {@see Sdk}. A safe Guzzle client is used by default;
+ * PSR-17 request and stream factories are discovered when not supplied.
  */
 final class SdkFactory
 {
@@ -26,6 +29,11 @@ final class SdkFactory
     private ?ContainerInterface $container = null;
     private string $userAgent = 'aisdk-php/1.0';
     private ?Model $defaultModel = null;
+    private ?TextModelInterface $defaultTextModel = null;
+    private ?ImageModelInterface $defaultImageModel = null;
+    private ?SpeechModelInterface $defaultSpeechModel = null;
+    private float $connectTimeout = 10.0;
+    private float $timeout = 120.0;
 
     public function withHttpClient(ClientInterface $client): self
     {
@@ -69,11 +77,58 @@ final class SdkFactory
         return $this;
     }
 
+    public function withConnectTimeout(float $seconds): self
+    {
+        if ($seconds <= 0) {
+            throw new \InvalidArgumentException('Connect timeout must be greater than zero.');
+        }
+
+        $this->connectTimeout = $seconds;
+
+        return $this;
+    }
+
+    public function withTimeout(float $seconds): self
+    {
+        if ($seconds <= 0) {
+            throw new \InvalidArgumentException('Timeout must be greater than zero.');
+        }
+
+        $this->timeout = $seconds;
+
+        return $this;
+    }
+
     public function withDefaultModel(Model $model): self
     {
         $this->defaultModel = $model;
 
+        if ($model instanceof TextModelInterface) {
+            $this->defaultTextModel = $model;
+        }
+        if ($model instanceof ImageModelInterface) {
+            $this->defaultImageModel = $model;
+        }
+        if ($model instanceof SpeechModelInterface) {
+            $this->defaultSpeechModel = $model;
+        }
+
         return $this;
+    }
+
+    public function withDefaultTextModel(TextModelInterface $model): self
+    {
+        return $this->withDefaultModel($model);
+    }
+
+    public function withDefaultImageModel(ImageModelInterface $model): self
+    {
+        return $this->withDefaultModel($model);
+    }
+
+    public function withDefaultSpeechModel(SpeechModelInterface $model): self
+    {
+        return $this->withDefaultModel($model);
     }
 
     public function defaultModel(): ?Model
@@ -81,16 +136,38 @@ final class SdkFactory
         return $this->defaultModel;
     }
 
+    public function defaultTextModel(): ?TextModelInterface
+    {
+        return $this->defaultTextModel;
+    }
+
+    public function defaultImageModel(): ?ImageModelInterface
+    {
+        return $this->defaultImageModel;
+    }
+
+    public function defaultSpeechModel(): ?SpeechModelInterface
+    {
+        return $this->defaultSpeechModel;
+    }
+
     public function make(): Sdk
     {
         return new Sdk(
-            httpClient: $this->httpClient ?? Psr18ClientDiscovery::find(),
+            httpClient: $this->httpClient ?? new Client([
+                'allow_redirects' => false,
+                'connect_timeout' => $this->connectTimeout,
+                'timeout' => $this->timeout,
+            ]),
             requestFactory: $this->requestFactory ?? Psr17FactoryDiscovery::findRequestFactory(),
             streamFactory: $this->streamFactory ?? Psr17FactoryDiscovery::findStreamFactory(),
             logger: $this->logger,
             container: $this->container,
             userAgent: $this->userAgent,
             defaultModel: $this->defaultModel,
+            defaultTextModel: $this->defaultTextModel,
+            defaultImageModel: $this->defaultImageModel,
+            defaultSpeechModel: $this->defaultSpeechModel,
         );
     }
 }

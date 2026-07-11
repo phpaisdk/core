@@ -17,17 +17,10 @@ trait HasProviderOptions
      */
     public function providerOptions(string $provider, array $options): static
     {
-        $this->providerOptions[$provider] = array_replace_recursive(
+        $this->providerOptions[$provider] = array_replace(
             $this->providerOptions[$provider] ?? [],
             $options,
         );
-
-        return $this;
-    }
-
-    public function providerOption(string $provider, string $key, mixed $value): static
-    {
-        $this->providerOptions[$provider][$key] = $value;
 
         return $this;
     }

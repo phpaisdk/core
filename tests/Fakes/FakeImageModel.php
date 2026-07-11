@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace AiSdk\Tests\Fakes;
 
-use AiSdk\Capability;
 use AiSdk\Contracts\BaseModel;
 use AiSdk\Contracts\ImageModelInterface;
 use AiSdk\Requests\ImageRequest;
@@ -15,13 +14,7 @@ final class FakeImageModel extends BaseModel implements ImageModelInterface
 {
     public ?ImageRequest $lastRequest = null;
 
-    /**
-     * @param  array<int, Capability>  $capabilities
-     */
-    public function __construct(
-        private readonly ImageResponse $response,
-        private readonly array $capabilities = [Capability::ImageGeneration],
-    ) {}
+    public function __construct(private readonly ImageResponse $response) {}
 
     public function provider(): string
     {
@@ -31,14 +24,6 @@ final class FakeImageModel extends BaseModel implements ImageModelInterface
     public function modelId(): string
     {
         return 'fake-image-1';
-    }
-
-    /**
-     * @return array<int, Capability>
-     */
-    public function capabilities(): array
-    {
-        return $this->capabilities;
     }
 
     public function generate(ImageRequest $request): ImageResponse
@@ -55,8 +40,4 @@ final class FakeImageModel extends BaseModel implements ImageModelInterface
         ]));
     }
 
-    public static function withoutImageGeneration(): self
-    {
-        return new self(new ImageResponse([]), capabilities: []);
-    }
 }

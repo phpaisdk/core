@@ -5,9 +5,7 @@ declare(strict_types=1);
 namespace AiSdk;
 
 /**
- * Immutable description of a model's capabilities and metadata. Used by
- * ModelRegistry for runtime model registration so users can register new
- * models without waiting for a package release.
+ * Immutable model information returned by provider discovery and inspection.
  */
 final class ModelDefinition
 {
@@ -25,7 +23,7 @@ final class ModelDefinition
     ) {}
 
     /**
-     * @param  array<string, mixed>  $data  Raw model definition data (from JSON catalog or runtime).
+     * @param  array<string, mixed>  $data  Raw model definition data from runtime discovery or application configuration.
      */
     public static function fromArray(array $data): self
     {

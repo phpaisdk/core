@@ -31,6 +31,29 @@ Generate::model(OpenAI::model('gpt-4o'));
 $result = Generate::text('Explain closures in PHP.')->run();
 ```
 
+For long-running workers, concurrent applications, or dependency-injected code, use an instance runtime so configuration is not stored in static process state:
+
+```php
+use AiSdk\OpenAI\OpenAIOptions;
+use AiSdk\OpenAI\OpenAIProvider;
+use AiSdk\Support\SdkFactory;
+
+$runtime = (new SdkFactory)
+    ->withConnectTimeout(10)
+    ->withTimeout(120)
+    ->make();
+
+$provider = new OpenAIProvider(OpenAIOptions::fromArray([
+    'apiKey' => $_ENV['OPENAI_API_KEY'],
+    'sdk' => $runtime,
+]));
+
+$sdk = $runtime->withDefaultTextModel($provider->textModel('gpt-4o'));
+$result = $sdk->text('Explain closures in PHP.')->run();
+```
+
+The static `Generate` and provider entry points remain convenient for scripts and request-scoped applications; the instance API is the safer choice when one PHP process serves multiple independent workloads.
+
 ## Structured Output
 
 ```php
@@ -173,28 +196,19 @@ $result = Generate::speech('Read this in a warm tone.')
     ->run();
 ```
 
-## Custom Model Registration
+## Model IDs and Capabilities
 
-Register new models at runtime without waiting for a package release:
+Model IDs are opaque provider values. Packages do not ship model inventories, so new, private, routed, deployed, and locally installed models can be used without waiting for an SDK release:
 
 ```php
-use AiSdk\Capability;
-use AiSdk\OpenAI;
-
-OpenAI::registerModel('gpt-4.2', capabilities: [
-    Capability::TextGeneration,
-    Capability::Streaming,
-    Capability::ToolCalling,
-    Capability::StructuredOutput,
-    Capability::TextInput,
-]);
-
 $result = Generate::text('Hello')
-    ->model(OpenAI::model('gpt-4.2'))
+    ->model(OpenAI::model('your-model-id'))
     ->run();
 ```
 
-Unknown unregistered model IDs are allowed for text generation. The provider API will return a normalized error if the model does not exist.
+Adapter capabilities are internal implementation details. Before sending a request, the SDK verifies that the selected provider adapter can serialize the requested features. The provider remains the authority on whether the exact model accepts those features. Models never need to be registered with the SDK.
+
+Providers whose available models depend on the current account, region, or local runtime may implement `AvailableModelsProviderInterface` and, where supported, `ModelInspectionProviderInterface`. Provider packages should query an authoritative runtime endpoint instead of presenting a bundled list as live availability. For example, Ollama exposes `Ollama::availableModels()` for its local registry and `Ollama::inspectModel()` for informational model details.
 
 ## Supported Capabilities
 
@@ -205,7 +219,6 @@ Unknown unregistered model IDs are allowed for text generation. The provider API
 - Tool calling (`->tool(...)`)
 - Structured output (`->output(...)`)
 - Provider options passthrough (`->providerOptions(...)`)
-- Custom model registration (`::registerModel(...)`)
 - Normalized provider errors
 
 ## Testing
@@ -217,9 +230,9 @@ composer test
 Core ships with fakes and assertions for deterministic testing:
 
 ```php
-use AiSdk\Tests\Fakes\FakeTextModel;
+use AiSdk\Testing\Fakes\FakeTextModel;
 
-$fake = new FakeTextModel(response: 'Hello!');
+$fake = FakeTextModel::text('Hello!');
 
 $result = Generate::text('Hi')
     ->model($fake)

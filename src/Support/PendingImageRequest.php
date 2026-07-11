@@ -4,11 +4,10 @@ declare(strict_types=1);
 
 namespace AiSdk\Support;
 
-use AiSdk\Capability;
 use AiSdk\Contracts\ImageModelInterface;
 use AiSdk\Exceptions\InvalidArgumentException;
+use AiSdk\Exceptions\InvalidResponseException;
 use AiSdk\Requests\ImageRequest;
-use AiSdk\Results\ImageData;
 use AiSdk\Results\ImageResult;
 
 final class PendingImageRequest
@@ -95,17 +94,21 @@ final class PendingImageRequest
     {
         $request = $this->request();
 
-        $model = ModelResolver::resolve(
-            $this->model,
-            ImageModelInterface::class,
-            'Generate::image()',
-            [Capability::ImageGeneration],
-        );
+        $model = ModelResolver::resolve($this->model, ImageModelInterface::class, 'Generate::image()');
 
         $response = $model->generate($request);
 
+        $output = $response->first();
+        if ($output === null) {
+            throw InvalidResponseException::forProvider(
+                $model->provider(),
+                sprintf('Provider [%s] returned no generated images.', $model->provider()),
+                ['modelId' => $model->modelId(), 'body' => $response->rawResponse],
+            );
+        }
+
         return new ImageResult(
-            output: $response->first() ?? new ImageData(),
+            output: $output,
             images: $response->images,
             usage: $response->usage,
             rawResponse: $response->rawResponse,

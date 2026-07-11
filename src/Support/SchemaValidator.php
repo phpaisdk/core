@@ -15,7 +15,7 @@ final class SchemaValidator
 {
     public static function validate(Schema $schema, mixed $value, string $path = 'value'): mixed
     {
-        if ($value === null && ($schema->isNullable() || ! $schema->isRequired())) {
+        if ($value === null && $schema->isNullable()) {
             return null;
         }
 
@@ -90,6 +90,16 @@ final class SchemaValidator
             }
 
             $value[$name] = self::validate($property, $value[$name], "{$path}.{$name}");
+        }
+
+        $unknown = array_diff_key($value, $schema->properties());
+        if ($unknown !== []) {
+            $name = (string) array_key_first($unknown);
+
+            throw new SchemaValidationException(
+                message: "Unknown field [{$path}.{$name}].",
+                context: ['path' => "{$path}.{$name}"],
+            );
         }
 
         return $value;

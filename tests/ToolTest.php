@@ -34,6 +34,18 @@ it('runs a tool with multiple inputs', function () {
     expect($tool->call(['from' => 'A', 'to' => 'B']))->toBe('A->B');
 });
 
+it('appends tools added with repeated singular calls', function () {
+    $request = Generate::text('Use tools')
+        ->tool(Tool::make('first')->run(fn(): string => 'first'))
+        ->tool(Tool::make('second')->run(fn(): string => 'second'));
+
+    $property = new ReflectionProperty($request, 'tools');
+    $tools = $property->getValue($request);
+
+    expect(array_map(fn(Tool $tool): string => $tool->name(), $tools))
+        ->toBe(['first', 'second']);
+});
+
 it('throws on missing required tool input', function () {
     $tool = Tool::make('weather')
         ->input(Schema::string('city')->required())

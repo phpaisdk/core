@@ -5,16 +5,11 @@ declare(strict_types=1);
 namespace AiSdk\Contracts;
 
 /**
- * A provider exposes model factories per modality. Modalities are added as
- * slices land; unsupported modalities throw NoSuchModelException (see BaseProvider).
+ * Stable identity shared by every provider. Modality factories live on
+ * capability-specific provider interfaces so adding a new SDK modality does
+ * not break third-party providers.
  */
 interface ProviderInterface
 {
     public function name(): string;
-
-    public function textModel(string $modelId): TextModelInterface;
-
-    public function imageModel(string $modelId): ImageModelInterface;
-
-    public function speechModel(string $modelId): SpeechModelInterface;
 }

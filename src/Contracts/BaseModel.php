@@ -6,68 +6,22 @@ namespace AiSdk\Contracts;
 
 use AiSdk\Capability;
 use AiSdk\CapabilitySupport;
-use AiSdk\Exceptions\InvalidArgumentException;
+use AiSdk\Exceptions\CapabilityNotSupportedException;
 use AiSdk\Generate;
+use AiSdk\Requests\TextModelRequest;
 use AiSdk\Support\Sdk;
 use AiSdk\Utils\Http\HttpRunner;
 
 /**
- * Shared scaffolding for provider models. Concrete models declare only
- * provider(), modelId(), capabilities(), and the actual generate()/stream().
+ * Shared scaffolding for provider models.
  */
 abstract class BaseModel implements Model
 {
     protected const string SPEC_VERSION = 'v1';
 
-    /** @var array<int, Capability> */
-    private array $assumedCapabilities = [];
-
-    private bool $allowUnknownCapabilities = false;
-
     public function specificationVersion(): string
     {
         return static::SPEC_VERSION;
-    }
-
-    public function supports(Capability $capability): bool
-    {
-        return $this->capability($capability)->isSupported();
-    }
-
-    public function capability(Capability $capability): CapabilitySupport
-    {
-        $configured = $this->configuredCapability($capability);
-        if ($configured !== null) {
-            return $configured;
-        }
-
-        if (in_array($capability, $this->capabilities(), true)) {
-            return CapabilitySupport::supported($capability, static::class);
-        }
-
-        return CapabilitySupport::notSupported($capability);
-    }
-
-    /**
-     * @param  array<int, Capability>  $capabilities
-     */
-    public function assume(array $capabilities): static
-    {
-        $clone = clone $this;
-        $clone->assumedCapabilities = self::uniqueCapabilities([
-            ...$this->assumedCapabilities,
-            ...$capabilities,
-        ]);
-
-        return $clone;
-    }
-
-    public function allowUnknownCapabilities(): static
-    {
-        $clone = clone $this;
-        $clone->allowUnknownCapabilities = true;
-
-        return $clone;
     }
 
     /**
@@ -79,48 +33,80 @@ abstract class BaseModel implements Model
         return HttpRunner::fromSdk($sdk ?? Generate::sdk());
     }
 
-    protected function configuredCapability(Capability $capability): ?CapabilitySupport
-    {
-        if ($this->allowUnknownCapabilities) {
-            return CapabilitySupport::supported($capability, 'user-allowed-unknown-capabilities');
-        }
-
-        if (in_array($capability, $this->assumedCapabilities, true)) {
-            return CapabilitySupport::supported($capability, 'user-assumed');
-        }
-
-        return null;
-    }
-
     /**
-     * @param  array<int, Capability>  $capabilities
-     * @return array<int, Capability>
+     * @param  array<int, Capability>  $adapterCapabilities
+     * @param  array<string, string>  $adaptedCapabilities
      */
-    protected function configuredCapabilities(array $capabilities): array
-    {
-        if ($this->allowUnknownCapabilities) {
-            return Capability::cases();
+    protected function ensureTextRequestSupported(
+        TextModelRequest $request,
+        array $adapterCapabilities,
+        array $adaptedCapabilities = [],
+        bool $streaming = false,
+    ): void {
+        $required = [Capability::TextGeneration];
+
+        if ($streaming) {
+            $required[] = Capability::Streaming;
         }
 
-        return self::uniqueCapabilities([...$capabilities, ...$this->assumedCapabilities]);
-    }
+        if ($request->output !== null) {
+            $required[] = Capability::StructuredOutput;
+        }
 
-    /**
-     * @param  array<int, mixed>  $capabilities
-     * @return array<int, Capability>
-     */
-    private static function uniqueCapabilities(array $capabilities): array
-    {
-        $unique = [];
+        if ($request->tools !== []) {
+            $required[] = Capability::ToolCalling;
+        }
 
-        foreach ($capabilities as $capability) {
-            if (! $capability instanceof Capability) {
-                throw new InvalidArgumentException('Assumed model capabilities must be Capability instances.');
+        if ($request->reasoning !== null) {
+            $required[] = Capability::Reasoning;
+        }
+
+        foreach ($request->messages as $message) {
+            foreach ($message->content as $content) {
+                $capability = match ($content->type) {
+                    \AiSdk\Content::TYPE_IMAGE => Capability::ImageInput,
+                    \AiSdk\Content::TYPE_AUDIO => Capability::AudioInput,
+                    \AiSdk\Content::TYPE_FILE => Capability::FileInput,
+                    default => null,
+                };
+
+                if ($capability !== null) {
+                    $required[] = $capability;
+                }
             }
-
-            $unique[$capability->name] = $capability;
         }
 
-        return array_values($unique);
+        foreach (array_unique($required, SORT_REGULAR) as $capability) {
+            $this->ensureAdapterCapability($capability, $adapterCapabilities, $adaptedCapabilities);
+        }
+    }
+
+    /**
+     * @param  array<string, string>  $adaptedCapabilities
+     */
+    protected function usesAdaptedCapability(Capability $capability, array $adaptedCapabilities): bool
+    {
+        return isset($adaptedCapabilities[$capability->name()]);
+    }
+
+    /**
+     * @param  array<int, Capability>  $adapterCapabilities
+     * @param  array<string, string>  $adaptedCapabilities
+     */
+    private function ensureAdapterCapability(
+        Capability $capability,
+        array $adapterCapabilities,
+        array $adaptedCapabilities,
+    ): void {
+        if (in_array($capability, $adapterCapabilities, true) || $this->usesAdaptedCapability($capability, $adaptedCapabilities)) {
+            return;
+        }
+
+        $support = CapabilitySupport::notSupported(
+            $capability,
+            "Provider adapter [{$this->provider()}] does not implement capability [{$capability->name()}].",
+        );
+
+        throw CapabilityNotSupportedException::fromSupport($this->provider(), $this->modelId(), $support);
     }
 }

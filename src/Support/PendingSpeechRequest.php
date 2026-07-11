@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace AiSdk\Support;
 
-use AiSdk\Capability;
 use AiSdk\Contracts\SpeechModelInterface;
 use AiSdk\Exceptions\InvalidArgumentException;
 use AiSdk\Requests\SpeechRequest;
@@ -71,12 +70,7 @@ final class PendingSpeechRequest
     {
         $request = $this->request();
 
-        $model = ModelResolver::resolve(
-            $this->model,
-            SpeechModelInterface::class,
-            'Generate::speech()',
-            [Capability::SpeechGeneration],
-        );
+        $model = ModelResolver::resolve($this->model, SpeechModelInterface::class, 'Generate::speech()');
 
         $response = $model->generate($request);
 

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace AiSdk\Support;
 
-use AiSdk\Capability;
 use AiSdk\Contracts\TextModelInterface;
 use AiSdk\Exceptions\InvalidArgumentException;
 use AiSdk\Exceptions\NoSuchToolException;
@@ -23,6 +22,7 @@ use AiSdk\Tool;
 use AiSdk\ToolCall;
 use AiSdk\ToolExecutionContext;
 use AiSdk\ToolResult;
+use Psr\Container\ContainerInterface;
 
 /**
  * Fluent text request, composed from focused traits (not a god-base).
@@ -36,7 +36,10 @@ final class PendingTextRequest
 
     private ?Output $output = null;
 
-    public function __construct(private ?TextModelInterface $model = null) {}
+    public function __construct(private ?TextModelInterface $model = null, ?ContainerInterface $container = null)
+    {
+        $this->toolContainer = $container;
+    }
 
     public function model(TextModelInterface $model): self
     {
@@ -55,9 +58,7 @@ final class PendingTextRequest
     public function run(): TextResult
     {
         $request = $this->request();
-        $required = $this->requiredCapabilities($request);
-
-        $model = ModelResolver::resolve($this->model, TextModelInterface::class, 'Generate::text()', $required);
+        $model = ModelResolver::resolve($this->model, TextModelInterface::class, 'Generate::text()');
 
         $messages = $request->messages;
         $toolCalls = [];
@@ -96,49 +97,13 @@ final class PendingTextRequest
     public function stream(): Stream
     {
         $request = $this->request();
-        $required = $this->requiredCapabilities($request);
-        $required[] = Capability::Streaming;
-
         $model = ModelResolver::resolve(
             $this->model,
             TextModelInterface::class,
             'Generate::text()->stream()',
-            $required,
         );
 
         return new Stream($model->stream($request));
-    }
-
-    /**
-     * @return array<int, Capability>
-     */
-    private function requiredCapabilities(TextModelRequest $request): array
-    {
-        $required = [Capability::TextGeneration];
-
-        if ($this->output !== null) {
-            $required[] = Capability::StructuredOutput;
-        }
-        if ($this->tools !== []) {
-            $required[] = Capability::ToolCalling;
-        }
-        if ($this->reasoning !== null) {
-            $required[] = Capability::Reasoning;
-        }
-
-        foreach ($request->messages as $message) {
-            foreach ($message->content as $content) {
-                $required[] = match ($content->type) {
-                    \AiSdk\Content::TYPE_TEXT => Capability::TextInput,
-                    \AiSdk\Content::TYPE_IMAGE => Capability::ImageInput,
-                    \AiSdk\Content::TYPE_AUDIO => Capability::AudioInput,
-                    \AiSdk\Content::TYPE_FILE => Capability::FileInput,
-                    default => Capability::TextInput,
-                };
-            }
-        }
-
-        return array_values(array_unique($required, SORT_REGULAR));
     }
 
     private function request(): TextModelRequest

@@ -10,6 +10,7 @@ use AiSdk\Support\Sdk;
 use AiSdk\Utils\Errors\HttpErrorNormalizer;
 use AiSdk\Utils\Stream\SseParser;
 use Generator;
+use GuzzleHttp\ClientInterface as GuzzleClientInterface;
 use Psr\Http\Client\ClientExceptionInterface;
 use Psr\Http\Client\ClientInterface;
 use Psr\Http\Message\RequestFactoryInterface;
@@ -54,6 +55,26 @@ final class HttpRunner
     }
 
     /**
+     * @param  array<string, string>  $headers
+     * @return array<string, mixed>
+     */
+    public function getJson(string $url, array $headers = [], string $provider = 'provider'): array
+    {
+        $request = $this->requestFactory->createRequest('GET', $url)
+            ->withHeader('Accept', 'application/json')
+            ->withHeader('User-Agent', $this->userAgent);
+
+        foreach ($headers as $name => $value) {
+            $request = $request->withHeader($name, $value);
+        }
+
+        $response = $this->send($request);
+        $this->ensureSuccess($response, $provider);
+
+        return Json::decode((string) $response->getBody(), $provider);
+    }
+
+    /**
      * @param  array<string, mixed>  $body
      * @param  array<string, string>  $headers
      */
@@ -73,7 +94,7 @@ final class HttpRunner
     public function postStream(string $url, array $body, array $headers = [], string $provider = 'provider'): Generator
     {
         $headers = array_replace(['Accept' => 'text/event-stream'], $headers);
-        $response = $this->send($this->prepareJson('POST', $url, $body, $headers));
+        $response = $this->send($this->prepareJson('POST', $url, $body, $headers), stream: true);
         $this->ensureSuccess($response, $provider);
 
         yield from SseParser::parseStream($response->getBody());
@@ -98,9 +119,16 @@ final class HttpRunner
         return $request;
     }
 
-    private function send(RequestInterface $request): ResponseInterface
+    private function send(RequestInterface $request, bool $stream = false): ResponseInterface
     {
         try {
+            if ($stream && $this->client instanceof GuzzleClientInterface) {
+                return $this->client->send($request, [
+                    'allow_redirects' => false,
+                    'stream' => true,
+                ]);
+            }
+
             return $this->client->sendRequest($request);
         } catch (ClientExceptionInterface $e) {
             throw new APIConnectionException(
@@ -113,7 +141,7 @@ final class HttpRunner
 
     private function ensureSuccess(ResponseInterface $response, string $provider): void
     {
-        if ($response->getStatusCode() < 400) {
+        if ($response->getStatusCode() >= 200 && $response->getStatusCode() < 300) {
             return;
         }
 

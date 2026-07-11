@@ -7,6 +7,7 @@ namespace AiSdk\Streaming;
 use AiSdk\Results\TextResult;
 use Generator;
 use IteratorAggregate;
+use Throwable;
 
 /**
  * User-facing wrapper around a provider Generator<StreamPart>. Accumulates
@@ -30,6 +31,15 @@ final class Stream implements IteratorAggregate
     private $onError = null;
 
     private readonly StreamState $state;
+
+    /** @var array<int, StreamPart> */
+    private array $history = [];
+
+    private bool $complete = false;
+
+    private ?Throwable $failure = null;
+
+    private bool $advanceSource = false;
 
     /**
      * @param  Generator<int, StreamPart>  $parts
@@ -80,34 +90,69 @@ final class Stream implements IteratorAggregate
      */
     public function parts(): Generator
     {
-        foreach ($this->parts as $part) {
-            if ($part instanceof ErrorPart) {
-                if ($this->onError !== null) {
-                    ($this->onError)($part->error);
+        if ($this->failure !== null) {
+            throw $this->failure;
+        }
 
-                    continue;
+        if ($this->complete) {
+            yield from $this->history;
+
+            return;
+        }
+
+        try {
+            while (true) {
+                if ($this->advanceSource) {
+                    $this->parts->next();
+                    $this->advanceSource = false;
                 }
 
-                throw $part->error;
+                if (! $this->parts->valid()) {
+                    break;
+                }
+
+                $part = $this->parts->current();
+                $this->advanceSource = true;
+
+                if ($part instanceof ErrorPart) {
+                    if ($this->onError !== null) {
+                        ($this->onError)($part->error);
+
+                        continue;
+                    }
+
+                    throw $part->error;
+                }
+
+                $this->history[] = $part;
+                $this->state->record($part);
+
+                if ($part instanceof TextDeltaPart && $this->onChunk !== null) {
+                    ($this->onChunk)($part->text);
+                }
+
+                yield $part;
             }
 
-            $this->state->record($part);
+            $this->complete = true;
 
-            if ($part instanceof TextDeltaPart && $this->onChunk !== null) {
-                ($this->onChunk)($part->text);
+            if ($this->onToolCall !== null) {
+                foreach ($this->state->toolCalls() as $call) {
+                    ($this->onToolCall)($call);
+                }
             }
 
-            yield $part;
-        }
-
-        if ($this->onToolCall !== null) {
-            foreach ($this->state->toolCalls() as $call) {
-                ($this->onToolCall)($call);
+            if ($this->onFinish !== null) {
+                ($this->onFinish)($this->result());
             }
-        }
+        } catch (Throwable $e) {
+            $this->failure = $e;
 
-        if ($this->onFinish !== null) {
-            ($this->onFinish)($this->result());
+            if ($this->onError !== null) {
+                ($this->onError)($e);
+            }
+
+            throw $e;
         }
     }
 
@@ -125,6 +170,14 @@ final class Stream implements IteratorAggregate
 
     public function run(): TextResult
     {
+        if ($this->failure !== null) {
+            throw $this->failure;
+        }
+
+        if ($this->complete) {
+            return $this->result();
+        }
+
         foreach ($this->parts() as $_) {
             // drain to drive accumulation + hooks
         }

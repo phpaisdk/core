@@ -45,3 +45,15 @@ it('validates enums', function () {
     $schema = Schema::enum(['a', 'b'], 'choice')->required();
     expect(SchemaValidator::validate($schema, 'a'))->toBe('a');
 });
+
+it('does not treat optional fields as nullable', function () {
+    SchemaValidator::validate(Schema::string('name'), null);
+})->throws(SchemaValidationException::class);
+
+it('rejects additional object properties', function () {
+    $schema = Schema::object('person', properties: [
+        Schema::string('name')->required(),
+    ]);
+
+    SchemaValidator::validate($schema, ['name' => 'Ada', 'extra' => true]);
+})->throws(SchemaValidationException::class);

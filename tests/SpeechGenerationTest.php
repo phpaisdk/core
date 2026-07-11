@@ -41,12 +41,6 @@ it('requires a speech model', function () {
     Generate::speech('Read this aloud')->run();
 })->throws(\AiSdk\Exceptions\InvalidArgumentException::class);
 
-it('requires speech generation capability', function () {
-    Generate::speech('Read this aloud')
-        ->model(FakeSpeechModel::withoutSpeechGeneration())
-        ->run();
-})->throws(\AiSdk\Exceptions\CapabilityNotSupportedException::class);
-
 it('encodes and saves audio data', function () {
     $audio = Generate::speech('Read this aloud')
         ->model(FakeSpeechModel::speech('audio-bytes', 'audio/wav'))

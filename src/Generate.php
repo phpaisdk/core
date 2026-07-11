@@ -55,7 +55,7 @@ final class Generate
 
     public static function text(?string $prompt = null): PendingTextRequest
     {
-        $request = new PendingTextRequest(self::defaultTextModel());
+        $request = new PendingTextRequest(self::defaultTextModel(), self::sdk()->container);
 
         return $prompt === null ? $request : $request->prompt($prompt);
     }
@@ -82,8 +82,8 @@ final class Generate
     private static function defaultTextModel(): ?TextModelInterface
     {
         $model = self::$sdk !== null
-            ? self::$sdk->defaultModel
-            : self::$runtimeFactory?->defaultModel();
+            ? self::$sdk->defaultTextModel ?? self::$sdk->defaultModel
+            : self::$runtimeFactory?->defaultTextModel() ?? self::$runtimeFactory?->defaultModel();
 
         return $model instanceof TextModelInterface ? $model : null;
     }
@@ -91,8 +91,8 @@ final class Generate
     private static function defaultImageModel(): ?ImageModelInterface
     {
         $model = self::$sdk !== null
-            ? self::$sdk->defaultModel
-            : self::$runtimeFactory?->defaultModel();
+            ? self::$sdk->defaultImageModel ?? self::$sdk->defaultModel
+            : self::$runtimeFactory?->defaultImageModel() ?? self::$runtimeFactory?->defaultModel();
 
         return $model instanceof ImageModelInterface ? $model : null;
     }
@@ -100,8 +100,8 @@ final class Generate
     private static function defaultSpeechModel(): ?SpeechModelInterface
     {
         $model = self::$sdk !== null
-            ? self::$sdk->defaultModel
-            : self::$runtimeFactory?->defaultModel();
+            ? self::$sdk->defaultSpeechModel ?? self::$sdk->defaultModel
+            : self::$runtimeFactory?->defaultSpeechModel() ?? self::$runtimeFactory?->defaultModel();
 
         return $model instanceof SpeechModelInterface ? $model : null;
     }
