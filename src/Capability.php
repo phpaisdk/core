@@ -18,9 +18,11 @@ enum Capability
     case ImageGeneration;
     case SpeechGeneration;
     case Embedding;
+    case VideoGeneration;
     case TextInput;
     case ImageInput;
     case AudioInput;
+    case VideoInput;
     case FileInput;
 
     public static function fromName(string $name): ?self
@@ -34,9 +36,11 @@ enum Capability
             'image_generation' => self::ImageGeneration,
             'speech_generation', 'text_to_speech' => self::SpeechGeneration,
             'embedding', 'embeddings' => self::Embedding,
+            'video_generation' => self::VideoGeneration,
             'text_input' => self::TextInput,
             'image_input', 'vision' => self::ImageInput,
             'audio_input' => self::AudioInput,
+            'video_input' => self::VideoInput,
             'file_input' => self::FileInput,
             default => null,
         };
@@ -53,9 +57,11 @@ enum Capability
             self::ImageGeneration => 'image_generation',
             self::SpeechGeneration => 'speech_generation',
             self::Embedding => 'embedding',
+            self::VideoGeneration => 'video_generation',
             self::TextInput => 'text_input',
             self::ImageInput => 'image_input',
             self::AudioInput => 'audio_input',
+            self::VideoInput => 'video_input',
             self::FileInput => 'file_input',
         };
     }

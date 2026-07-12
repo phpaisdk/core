@@ -66,6 +66,7 @@ abstract class BaseModel implements Model
                 $capability = match ($content->type) {
                     \AiSdk\Content::TYPE_IMAGE => Capability::ImageInput,
                     \AiSdk\Content::TYPE_AUDIO => Capability::AudioInput,
+                    \AiSdk\Content::TYPE_VIDEO => Capability::VideoInput,
                     \AiSdk\Content::TYPE_FILE => Capability::FileInput,
                     default => null,
                 };

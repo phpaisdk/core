@@ -9,6 +9,7 @@ use AiSdk\Contracts\ImageModelInterface;
 use AiSdk\Contracts\Model;
 use AiSdk\Contracts\SpeechModelInterface;
 use AiSdk\Contracts\TextModelInterface;
+use AiSdk\Contracts\VideoModelInterface;
 use Psr\Container\ContainerInterface;
 use Psr\Http\Client\ClientInterface;
 use Psr\Http\Message\RequestFactoryInterface;
@@ -33,6 +34,7 @@ final class Sdk
         public readonly ?ImageModelInterface $defaultImageModel = null,
         public readonly ?SpeechModelInterface $defaultSpeechModel = null,
         public readonly ?EmbeddingModelInterface $defaultEmbeddingModel = null,
+        public readonly ?VideoModelInterface $defaultVideoModel = null,
     ) {}
 
     public function withDefaultModel(Model $model): self
@@ -49,6 +51,7 @@ final class Sdk
             defaultImageModel: $model instanceof ImageModelInterface ? $model : $this->defaultImageModel,
             defaultSpeechModel: $model instanceof SpeechModelInterface ? $model : $this->defaultSpeechModel,
             defaultEmbeddingModel: $model instanceof EmbeddingModelInterface ? $model : $this->defaultEmbeddingModel,
+            defaultVideoModel: $model instanceof VideoModelInterface ? $model : $this->defaultVideoModel,
         );
     }
 
@@ -70,6 +73,18 @@ final class Sdk
     public function withDefaultEmbeddingModel(EmbeddingModelInterface $model): self
     {
         return $this->withDefaultModel($model);
+    }
+
+    public function withDefaultVideoModel(VideoModelInterface $model): self
+    {
+        return $this->withDefaultModel($model);
+    }
+
+    public function video(?string $prompt = null): PendingVideoRequest
+    {
+        $request = new PendingVideoRequest($this->defaultVideoModel);
+
+        return $prompt === null ? $request : $request->prompt($prompt);
     }
 
     public function text(?string $prompt = null): PendingTextRequest

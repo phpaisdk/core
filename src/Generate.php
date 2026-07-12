@@ -9,10 +9,12 @@ use AiSdk\Contracts\ImageModelInterface;
 use AiSdk\Contracts\Model;
 use AiSdk\Contracts\SpeechModelInterface;
 use AiSdk\Contracts\TextModelInterface;
+use AiSdk\Contracts\VideoModelInterface;
 use AiSdk\Support\PendingEmbeddingRequest;
 use AiSdk\Support\PendingImageRequest;
 use AiSdk\Support\PendingSpeechRequest;
 use AiSdk\Support\PendingTextRequest;
+use AiSdk\Support\PendingVideoRequest;
 use AiSdk\Support\Sdk;
 use AiSdk\Support\SdkFactory;
 
@@ -86,6 +88,18 @@ final class Generate
         return $input === null ? $request : $request->input($input);
     }
 
+    public static function video(?string $prompt = null): PendingVideoRequest
+    {
+        $request = new PendingVideoRequest(self::defaultVideoModel());
+
+        return $prompt === null ? $request : $request->prompt($prompt);
+    }
+
+    public static function videoJob(?string $prompt = null): PendingVideoRequest
+    {
+        return self::video($prompt);
+    }
+
     private static function runtimeFactory(): SdkFactory
     {
         return self::$runtimeFactory ??= self::factory();
@@ -125,5 +139,14 @@ final class Generate
             : self::$runtimeFactory?->defaultEmbeddingModel() ?? self::$runtimeFactory?->defaultModel();
 
         return $model instanceof EmbeddingModelInterface ? $model : null;
+    }
+
+    private static function defaultVideoModel(): ?VideoModelInterface
+    {
+        $model = self::$sdk !== null
+            ? self::$sdk->defaultVideoModel ?? self::$sdk->defaultModel
+            : self::$runtimeFactory?->defaultVideoModel() ?? self::$runtimeFactory?->defaultModel();
+
+        return $model instanceof VideoModelInterface ? $model : null;
     }
 }

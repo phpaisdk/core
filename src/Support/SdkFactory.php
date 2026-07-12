@@ -9,6 +9,7 @@ use AiSdk\Contracts\ImageModelInterface;
 use AiSdk\Contracts\Model;
 use AiSdk\Contracts\SpeechModelInterface;
 use AiSdk\Contracts\TextModelInterface;
+use AiSdk\Contracts\VideoModelInterface;
 use GuzzleHttp\Client;
 use Http\Discovery\Psr17FactoryDiscovery;
 use Psr\Container\ContainerInterface;
@@ -34,6 +35,7 @@ final class SdkFactory
     private ?ImageModelInterface $defaultImageModel = null;
     private ?SpeechModelInterface $defaultSpeechModel = null;
     private ?EmbeddingModelInterface $defaultEmbeddingModel = null;
+    private ?VideoModelInterface $defaultVideoModel = null;
     private float $connectTimeout = 10.0;
     private float $timeout = 120.0;
 
@@ -117,6 +119,9 @@ final class SdkFactory
         if ($model instanceof EmbeddingModelInterface) {
             $this->defaultEmbeddingModel = $model;
         }
+        if ($model instanceof VideoModelInterface) {
+            $this->defaultVideoModel = $model;
+        }
 
         return $this;
     }
@@ -137,6 +142,11 @@ final class SdkFactory
     }
 
     public function withDefaultEmbeddingModel(EmbeddingModelInterface $model): self
+    {
+        return $this->withDefaultModel($model);
+    }
+
+    public function withDefaultVideoModel(VideoModelInterface $model): self
     {
         return $this->withDefaultModel($model);
     }
@@ -166,6 +176,11 @@ final class SdkFactory
         return $this->defaultEmbeddingModel;
     }
 
+    public function defaultVideoModel(): ?VideoModelInterface
+    {
+        return $this->defaultVideoModel;
+    }
+
     public function make(): Sdk
     {
         return new Sdk(
@@ -184,6 +199,7 @@ final class SdkFactory
             defaultImageModel: $this->defaultImageModel,
             defaultSpeechModel: $this->defaultSpeechModel,
             defaultEmbeddingModel: $this->defaultEmbeddingModel,
+            defaultVideoModel: $this->defaultVideoModel,
         );
     }
 }

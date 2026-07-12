@@ -220,6 +220,23 @@ $allVectors = $result->embeddings;
 
 ## Model IDs and Capabilities
 
+## Video Generation
+
+Video providers expose asynchronous jobs through one portable API. `run()` waits for completion; `job()` starts the operation and returns its job descriptor.
+
+```php
+$result = Generate::video('A cinematic product reveal')
+    ->model($provider->videoModel('video-model-id'))
+    ->aspectRatio('16:9')
+    ->resolution('1280x720')
+    ->duration(8)
+    ->run(timeout: 600);
+
+$job = Generate::videoJob('A glass PHP logo rotating in space')
+    ->model($provider->videoModel('video-model-id'))
+    ->job();
+```
+
 Model IDs are opaque provider values. Packages do not ship model inventories, so new, private, routed, deployed, and locally installed models can be used without waiting for an SDK release:
 
 ```php
@@ -239,6 +256,7 @@ Providers whose available models depend on the current account, region, or local
 - Image generation (`Generate::image()`)
 - Speech generation (`Generate::speech()`)
 - Text embeddings (`Generate::embedding()`)
+- Video generation and asynchronous jobs (`Generate::video()`, `Generate::videoJob()`)
 - Tool calling (`->tool(...)`)
 - Structured output (`->output(...)`)
 - Provider options passthrough (`->providerOptions(...)`)

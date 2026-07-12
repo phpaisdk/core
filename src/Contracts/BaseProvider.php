@@ -35,4 +35,9 @@ abstract class BaseProvider implements ProviderInterface
         throw NoSuchModelException::for($this->name(), $modelId, 'embeddingModel');
     }
 
+    public function videoModel(string $modelId): VideoModelInterface
+    {
+        throw NoSuchModelException::for($this->name(), $modelId, 'videoModel');
+    }
+
 }

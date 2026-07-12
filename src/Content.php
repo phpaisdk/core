@@ -8,13 +8,14 @@ use AiSdk\Exceptions\InvalidArgumentException;
 use Stringable;
 
 /**
- * A single typed input part for text generation.
+ * A single typed model input part.
  */
 final class Content
 {
     public const string TYPE_TEXT = 'text';
     public const string TYPE_IMAGE = 'image';
     public const string TYPE_AUDIO = 'audio';
+    public const string TYPE_VIDEO = 'video';
     public const string TYPE_FILE = 'file';
 
     /**
@@ -41,6 +42,11 @@ final class Content
     public static function audio(string|Stringable $source, ?string $mimeType = null, ?string $filename = null, ?InputEncoding $encoding = null): self
     {
         return new self(self::TYPE_AUDIO, self::resolveSource((string) $source, $mimeType, $filename, $encoding));
+    }
+
+    public static function video(string|Stringable $source, ?string $mimeType = null, ?string $filename = null, ?InputEncoding $encoding = null): self
+    {
+        return new self(self::TYPE_VIDEO, self::resolveSource((string) $source, $mimeType, $filename, $encoding));
     }
 
     public static function file(string|Stringable $source, ?string $mimeType = null, ?string $filename = null, ?InputEncoding $encoding = null): self

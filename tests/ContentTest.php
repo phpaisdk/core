@@ -54,6 +54,94 @@ it('resolves raw input', function () {
         ->and($content->base64Data())->toBe(base64_encode('raw-bytes'));
 });
 
+it('resolves a readable local media file as raw input', function () {
+    $path = tempnam(sys_get_temp_dir(), 'aisdk-content-');
+    file_put_contents($path, 'local-bytes');
+
+    try {
+        $content = Content::audio($path, mimeType: 'audio/wav');
+
+        expect($content->source())->toBe(ContentSource::Raw)
+            ->and($content->data())->toBe('local-bytes')
+            ->and($content->mimeType())->toBe('audio/wav')
+            ->and($content->filename())->toBe(basename($path));
+    } finally {
+        @unlink($path);
+    }
+});
+
+it('requires a mime type for explicit base64 input', function () {
+    Content::file('JVBERi0=', encoding: InputEncoding::Base64);
+})->throws(\AiSdk\Exceptions\InvalidArgumentException::class, 'Base64 content requires a MIME type.');
+
+it('rejects malformed data uri input', function () {
+    Content::audio('data:not-valid');
+})->throws(\AiSdk\Exceptions\InvalidArgumentException::class, 'Invalid data URI content.');
+
 it('requires a mime type for raw input', function () {
     Content::image('not-a-path-or-url');
 })->throws(\AiSdk\Exceptions\InvalidArgumentException::class);
+
+it('resolves video urls', function () {
+    $content = Content::video('https://example.com/clips/demo.mp4');
+
+    expect($content->type)->toBe(Content::TYPE_VIDEO)
+        ->and($content->source())->toBe(ContentSource::Url)
+        ->and($content->url())->toBe('https://example.com/clips/demo.mp4')
+        ->and($content->filename())->toBe('demo.mp4');
+});
+
+it('resolves video data uri input', function () {
+    $content = Content::video('data:video/mp4;base64,AAAA');
+
+    expect($content->type)->toBe(Content::TYPE_VIDEO)
+        ->and($content->source())->toBe(ContentSource::DataUri)
+        ->and($content->mimeType())->toBe('video/mp4')
+        ->and($content->base64Data())->toBe('AAAA');
+});
+
+it('resolves explicit base64 video input', function () {
+    $content = Content::video('AAAA', mimeType: 'video/mp4', filename: 'clip.mp4', encoding: InputEncoding::Base64);
+
+    expect($content->source())->toBe(ContentSource::Base64)
+        ->and($content->data())->toBe('AAAA')
+        ->and($content->mimeType())->toBe('video/mp4')
+        ->and($content->filename())->toBe('clip.mp4');
+});
+
+it('resolves local video file input', function () {
+    $path = tempnam(sys_get_temp_dir(), 'aisdk-video-content-');
+    file_put_contents($path, 'video-file-bytes');
+
+    try {
+        $content = Content::video($path, mimeType: 'video/mp4');
+
+        expect($content->source())->toBe(ContentSource::Raw)
+            ->and($content->data())->toBe('video-file-bytes')
+            ->and($content->mimeType())->toBe('video/mp4')
+            ->and($content->filename())->toBe(basename($path));
+    } finally {
+        @unlink($path);
+    }
+});
+
+it('resolves raw video bytes', function () {
+    $content = Content::video("\x00\x00video-bytes", mimeType: 'video/webm', filename: 'clip.webm');
+
+    expect($content->source())->toBe(ContentSource::Raw)
+        ->and($content->data())->toBe("\x00\x00video-bytes")
+        ->and($content->base64Data())->toBe(base64_encode("\x00\x00video-bytes"))
+        ->and($content->mimeType())->toBe('video/webm');
+});
+
+it('requires a mime type for raw video input', function () {
+    Content::video('raw-video-bytes');
+})->throws(\AiSdk\Exceptions\InvalidArgumentException::class, 'Raw content requires a MIME type.');
+
+it('requires a mime type for base64 video input', function () {
+    Content::video('AAAA', encoding: InputEncoding::Base64);
+})->throws(\AiSdk\Exceptions\InvalidArgumentException::class, 'Base64 content requires a MIME type.');
+
+it('rejects malformed video data uri input', function () {
+    Content::video('data:video/mp4;broken');
+})->throws(\AiSdk\Exceptions\InvalidArgumentException::class, 'Invalid data URI content.');
