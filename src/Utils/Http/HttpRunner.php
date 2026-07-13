@@ -86,6 +86,18 @@ final class HttpRunner
         return $response;
     }
 
+    public function sendRequest(RequestInterface $request, string $provider = 'provider'): ResponseInterface
+    {
+        if (! $request->hasHeader('User-Agent')) {
+            $request = $request->withHeader('User-Agent', $this->userAgent);
+        }
+
+        $response = $this->send($request);
+        $this->ensureSuccess($response, $provider);
+
+        return $response;
+    }
+
     /**
      * @param  array<string, mixed>  $body
      * @param  array<string, string>  $headers

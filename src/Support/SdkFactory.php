@@ -9,6 +9,7 @@ use AiSdk\Contracts\ImageModelInterface;
 use AiSdk\Contracts\Model;
 use AiSdk\Contracts\SpeechModelInterface;
 use AiSdk\Contracts\TextModelInterface;
+use AiSdk\Contracts\TranscriptionModelInterface;
 use AiSdk\Contracts\VideoModelInterface;
 use GuzzleHttp\Client;
 use Http\Discovery\Psr17FactoryDiscovery;
@@ -34,6 +35,7 @@ final class SdkFactory
     private ?TextModelInterface $defaultTextModel = null;
     private ?ImageModelInterface $defaultImageModel = null;
     private ?SpeechModelInterface $defaultSpeechModel = null;
+    private ?TranscriptionModelInterface $defaultTranscriptionModel = null;
     private ?EmbeddingModelInterface $defaultEmbeddingModel = null;
     private ?VideoModelInterface $defaultVideoModel = null;
     private float $connectTimeout = 10.0;
@@ -116,6 +118,9 @@ final class SdkFactory
         if ($model instanceof SpeechModelInterface) {
             $this->defaultSpeechModel = $model;
         }
+        if ($model instanceof TranscriptionModelInterface) {
+            $this->defaultTranscriptionModel = $model;
+        }
         if ($model instanceof EmbeddingModelInterface) {
             $this->defaultEmbeddingModel = $model;
         }
@@ -137,6 +142,11 @@ final class SdkFactory
     }
 
     public function withDefaultSpeechModel(SpeechModelInterface $model): self
+    {
+        return $this->withDefaultModel($model);
+    }
+
+    public function withDefaultTranscriptionModel(TranscriptionModelInterface $model): self
     {
         return $this->withDefaultModel($model);
     }
@@ -171,6 +181,11 @@ final class SdkFactory
         return $this->defaultSpeechModel;
     }
 
+    public function defaultTranscriptionModel(): ?TranscriptionModelInterface
+    {
+        return $this->defaultTranscriptionModel;
+    }
+
     public function defaultEmbeddingModel(): ?EmbeddingModelInterface
     {
         return $this->defaultEmbeddingModel;
@@ -198,6 +213,7 @@ final class SdkFactory
             defaultTextModel: $this->defaultTextModel,
             defaultImageModel: $this->defaultImageModel,
             defaultSpeechModel: $this->defaultSpeechModel,
+            defaultTranscriptionModel: $this->defaultTranscriptionModel,
             defaultEmbeddingModel: $this->defaultEmbeddingModel,
             defaultVideoModel: $this->defaultVideoModel,
         );

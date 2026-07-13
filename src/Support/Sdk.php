@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace AiSdk\Support;
 
+use AiSdk\Content;
 use AiSdk\Contracts\EmbeddingModelInterface;
 use AiSdk\Contracts\ImageModelInterface;
 use AiSdk\Contracts\Model;
 use AiSdk\Contracts\SpeechModelInterface;
 use AiSdk\Contracts\TextModelInterface;
+use AiSdk\Contracts\TranscriptionModelInterface;
 use AiSdk\Contracts\VideoModelInterface;
 use Psr\Container\ContainerInterface;
 use Psr\Http\Client\ClientInterface;
@@ -35,6 +37,7 @@ final class Sdk
         public readonly ?SpeechModelInterface $defaultSpeechModel = null,
         public readonly ?EmbeddingModelInterface $defaultEmbeddingModel = null,
         public readonly ?VideoModelInterface $defaultVideoModel = null,
+        public readonly ?TranscriptionModelInterface $defaultTranscriptionModel = null,
     ) {}
 
     public function withDefaultModel(Model $model): self
@@ -50,6 +53,7 @@ final class Sdk
             defaultTextModel: $model instanceof TextModelInterface ? $model : $this->defaultTextModel,
             defaultImageModel: $model instanceof ImageModelInterface ? $model : $this->defaultImageModel,
             defaultSpeechModel: $model instanceof SpeechModelInterface ? $model : $this->defaultSpeechModel,
+            defaultTranscriptionModel: $model instanceof TranscriptionModelInterface ? $model : $this->defaultTranscriptionModel,
             defaultEmbeddingModel: $model instanceof EmbeddingModelInterface ? $model : $this->defaultEmbeddingModel,
             defaultVideoModel: $model instanceof VideoModelInterface ? $model : $this->defaultVideoModel,
         );
@@ -66,6 +70,11 @@ final class Sdk
     }
 
     public function withDefaultSpeechModel(SpeechModelInterface $model): self
+    {
+        return $this->withDefaultModel($model);
+    }
+
+    public function withDefaultTranscriptionModel(TranscriptionModelInterface $model): self
     {
         return $this->withDefaultModel($model);
     }
@@ -106,6 +115,13 @@ final class Sdk
         $request = new PendingSpeechRequest($this->defaultSpeechModel);
 
         return $input === null ? $request : $request->input($input);
+    }
+
+    public function transcription(?Content $audio = null): PendingTranscriptionRequest
+    {
+        $request = new PendingTranscriptionRequest($this->defaultTranscriptionModel);
+
+        return $audio === null ? $request : $request->audio($audio);
     }
 
     /**

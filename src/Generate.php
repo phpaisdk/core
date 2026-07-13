@@ -9,11 +9,13 @@ use AiSdk\Contracts\ImageModelInterface;
 use AiSdk\Contracts\Model;
 use AiSdk\Contracts\SpeechModelInterface;
 use AiSdk\Contracts\TextModelInterface;
+use AiSdk\Contracts\TranscriptionModelInterface;
 use AiSdk\Contracts\VideoModelInterface;
 use AiSdk\Support\PendingEmbeddingRequest;
 use AiSdk\Support\PendingImageRequest;
 use AiSdk\Support\PendingSpeechRequest;
 use AiSdk\Support\PendingTextRequest;
+use AiSdk\Support\PendingTranscriptionRequest;
 use AiSdk\Support\PendingVideoRequest;
 use AiSdk\Support\Sdk;
 use AiSdk\Support\SdkFactory;
@@ -78,6 +80,13 @@ final class Generate
         return $input === null ? $request : $request->input($input);
     }
 
+    public static function transcription(?Content $audio = null): PendingTranscriptionRequest
+    {
+        $request = new PendingTranscriptionRequest(self::defaultTranscriptionModel());
+
+        return $audio === null ? $request : $request->audio($audio);
+    }
+
     /**
      * @param  string|array<int, string>|null  $input
      */
@@ -139,6 +148,15 @@ final class Generate
             : self::$runtimeFactory?->defaultEmbeddingModel() ?? self::$runtimeFactory?->defaultModel();
 
         return $model instanceof EmbeddingModelInterface ? $model : null;
+    }
+
+    private static function defaultTranscriptionModel(): ?TranscriptionModelInterface
+    {
+        $model = self::$sdk !== null
+            ? self::$sdk->defaultTranscriptionModel ?? self::$sdk->defaultModel
+            : self::$runtimeFactory?->defaultTranscriptionModel() ?? self::$runtimeFactory?->defaultModel();
+
+        return $model instanceof TranscriptionModelInterface ? $model : null;
     }
 
     private static function defaultVideoModel(): ?VideoModelInterface

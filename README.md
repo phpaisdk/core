@@ -218,6 +218,22 @@ $allVectors = $result->embeddings;
 
 `dimensions()` is the only portable embedding option. Provider-specific fields such as retrieval task type or truncation can be sent with `providerOptions()` using the provider package's documented field names.
 
+## Transcription
+
+```php
+use AiSdk\Content;
+use AiSdk\Generate;
+use AiSdk\OpenAI;
+
+$result = Generate::transcription(Content::audio(__DIR__.'/meeting.mp3'))
+    ->model(OpenAI::transcription('gpt-4o-transcribe'))
+    ->run();
+
+echo $result->output->text;
+```
+
+The portable transcription surface accepts typed audio content. Language hints, diarization, timestamp detail, and other provider-specific controls remain available through `providerOptions()`.
+
 ## Model IDs and Capabilities
 
 ## Video Generation
@@ -256,6 +272,7 @@ Providers whose available models depend on the current account, region, or local
 - Image generation (`Generate::image()`)
 - Speech generation (`Generate::speech()`)
 - Text embeddings (`Generate::embedding()`)
+- Audio transcription (`Generate::transcription()`)
 - Video generation and asynchronous jobs (`Generate::video()`, `Generate::videoJob()`)
 - Tool calling (`->tool(...)`)
 - Structured output (`->output(...)`)
@@ -283,6 +300,7 @@ expect($result->text)->toBe('Hello!');
 ```
 
 Embedding tests can use `AiSdk\Testing\Fakes\FakeEmbeddingModel` in the same way.
+Transcription tests can use `AiSdk\Testing\Fakes\FakeTranscriptionModel`.
 
 ## Links
 
