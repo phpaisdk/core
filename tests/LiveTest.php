@@ -223,10 +223,15 @@ it('executes registered live tools and sends their result to the provider', func
 
     $events = iterator_to_array($session->events());
 
+    $toolResult = $events[1] ?? null;
+    if (! $toolResult instanceof \AiSdk\Live\ToolResultEvent) {
+        throw new \LogicException('Expected an automatic tool result event.');
+    }
+
     expect($events)->toHaveCount(2)
         ->and($events[0])->toBeInstanceOf(\AiSdk\Live\ToolCallEvent::class)
-        ->and($events[1])->toBeInstanceOf(\AiSdk\Live\ToolResultEvent::class)
-        ->and($events[1]->automatic)->toBeTrue()
+        ->and($toolResult)->toBeInstanceOf(\AiSdk\Live\ToolResultEvent::class)
+        ->and($toolResult->automatic)->toBeTrue()
         ->and($driver->result)->toBe('sunny');
 });
 
@@ -358,12 +363,13 @@ it('does not suggest generation defaults when a Live model is missing', function
 
     try {
         \AiSdk\Live::voice()->connect($transport);
-        $this->fail('Expected Live model resolution to fail.');
+
+        throw new \LogicException('Expected Live model resolution to fail.');
     } catch (\AiSdk\Exceptions\InvalidArgumentException $exception) {
         expect($exception->getMessage())
             ->toContain('Live::voice() requires a model')
-            ->toContain('Call ->model(...).')
-            ->not->toContain('Generate::model');
+            ->toContain('Call ->model(...).');
+        expect(str_contains($exception->getMessage(), 'Generate::model'))->toBeFalse();
     }
 });
 
