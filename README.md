@@ -1,5 +1,13 @@
 # aisdk/core
 
+<a href="https://github.com/phpaisdk/core/actions"><img alt="GitHub Workflow Status" src="https://img.shields.io/github/actions/workflow/status/phpaisdk/core/tests.yml?branch=main&label=Tests"></a>
+<a href="https://packagist.org/packages/aisdk/core"><img alt="Total Downloads" src="https://img.shields.io/packagist/dt/aisdk/core"></a>
+<a href="https://packagist.org/packages/aisdk/core"><img alt="Latest Version" src="https://img.shields.io/packagist/v/aisdk/core"></a>
+<a href="https://packagist.org/packages/aisdk/core"><img alt="License" src="https://img.shields.io/packagist/l/aisdk/core"></a>
+<a href="https://whyphp.dev"><img src="https://img.shields.io/badge/Why_PHP-in_2026-7A86E8?style=flat-square&labelColor=18181b" alt="Why PHP in 2026"></a>
+
+------
+
 Framework-agnostic PHP AI SDK core: contracts, fluent API, value objects, streaming, tools, structured output, and PSR integration.
 
 ## Installation
