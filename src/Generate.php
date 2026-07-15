@@ -4,13 +4,7 @@ declare(strict_types=1);
 
 namespace AiSdk;
 
-use AiSdk\Contracts\EmbeddingModelInterface;
-use AiSdk\Contracts\ImageModelInterface;
 use AiSdk\Contracts\Model;
-use AiSdk\Contracts\SpeechModelInterface;
-use AiSdk\Contracts\TextModelInterface;
-use AiSdk\Contracts\TranscriptionModelInterface;
-use AiSdk\Contracts\VideoModelInterface;
 use AiSdk\Support\PendingEmbeddingRequest;
 use AiSdk\Support\PendingImageRequest;
 use AiSdk\Support\PendingSpeechRequest;
@@ -114,57 +108,57 @@ final class Generate
         return self::$runtimeFactory ??= self::factory();
     }
 
-    private static function defaultTextModel(): ?TextModelInterface
+    private static function defaultTextModel(): ?Model
     {
         $model = self::$sdk !== null
             ? self::$sdk->defaultTextModel ?? self::$sdk->defaultModel
             : self::$runtimeFactory?->defaultTextModel() ?? self::$runtimeFactory?->defaultModel();
 
-        return $model instanceof TextModelInterface ? $model : null;
+        return $model;
     }
 
-    private static function defaultImageModel(): ?ImageModelInterface
+    private static function defaultImageModel(): ?Model
     {
         $model = self::$sdk !== null
             ? self::$sdk->defaultImageModel ?? self::$sdk->defaultModel
             : self::$runtimeFactory?->defaultImageModel() ?? self::$runtimeFactory?->defaultModel();
 
-        return $model instanceof ImageModelInterface ? $model : null;
+        return $model;
     }
 
-    private static function defaultSpeechModel(): ?SpeechModelInterface
+    private static function defaultSpeechModel(): ?Model
     {
         $model = self::$sdk !== null
             ? self::$sdk->defaultSpeechModel ?? self::$sdk->defaultModel
             : self::$runtimeFactory?->defaultSpeechModel() ?? self::$runtimeFactory?->defaultModel();
 
-        return $model instanceof SpeechModelInterface ? $model : null;
+        return $model;
     }
 
-    private static function defaultEmbeddingModel(): ?EmbeddingModelInterface
+    private static function defaultEmbeddingModel(): ?Model
     {
         $model = self::$sdk !== null
             ? self::$sdk->defaultEmbeddingModel ?? self::$sdk->defaultModel
             : self::$runtimeFactory?->defaultEmbeddingModel() ?? self::$runtimeFactory?->defaultModel();
 
-        return $model instanceof EmbeddingModelInterface ? $model : null;
+        return $model;
     }
 
-    private static function defaultTranscriptionModel(): ?TranscriptionModelInterface
+    private static function defaultTranscriptionModel(): ?Model
     {
         $model = self::$sdk !== null
             ? self::$sdk->defaultTranscriptionModel ?? self::$sdk->defaultModel
             : self::$runtimeFactory?->defaultTranscriptionModel() ?? self::$runtimeFactory?->defaultModel();
 
-        return $model instanceof TranscriptionModelInterface ? $model : null;
+        return $model;
     }
 
-    private static function defaultVideoModel(): ?VideoModelInterface
+    private static function defaultVideoModel(): ?Model
     {
         $model = self::$sdk !== null
             ? self::$sdk->defaultVideoModel ?? self::$sdk->defaultModel
             : self::$runtimeFactory?->defaultVideoModel() ?? self::$runtimeFactory?->defaultModel();
 
-        return $model instanceof VideoModelInterface ? $model : null;
+        return $model;
     }
 }

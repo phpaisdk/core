@@ -4,7 +4,5 @@ declare(strict_types=1);
 
 namespace AiSdk\Contracts;
 
-interface TextProviderInterface extends ProviderInterface
-{
-    public function textModel(string $modelId): TextModelInterface;
-}
+/** Marker for providers that resolve text adapters through model(). */
+interface TextProviderInterface extends ProviderInterface {}

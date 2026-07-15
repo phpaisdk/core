@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace AiSdk\Support;
 
 use AiSdk\Content;
+use AiSdk\Contracts\Model;
 use AiSdk\Contracts\TranscriptionModelInterface;
 use AiSdk\Exceptions\InvalidArgumentException;
 use AiSdk\Requests\TranscriptionRequest;
@@ -17,9 +18,9 @@ final class PendingTranscriptionRequest
     /** @var array<string, array<string, mixed>> */
     private array $providerOptions = [];
 
-    public function __construct(private ?TranscriptionModelInterface $model = null) {}
+    public function __construct(private ?Model $model = null) {}
 
-    public function model(TranscriptionModelInterface $model): self
+    public function model(Model $model): self
     {
         $this->model = $model;
 

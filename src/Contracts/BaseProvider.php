@@ -5,39 +5,73 @@ declare(strict_types=1);
 namespace AiSdk\Contracts;
 
 use AiSdk\Exceptions\NoSuchModelException;
+use AiSdk\Live\Contracts\LiveModelInterface;
+use AiSdk\ProviderModel;
 
 /**
- * Optional base for providers. Every modality factory throws
- * NoSuchModelException by default; a concrete provider overrides only the
- * modalities it actually supports. Eliminates per-provider throw boilerplate.
+ * Optional base for providers. Public model references are resolved into
+ * protected capability adapters only when an operation executes.
  */
 abstract class BaseProvider implements ProviderInterface
 {
     abstract public function name(): string;
 
-    public function textModel(string $modelId): TextModelInterface
+    final public function model(string $modelId): Model
+    {
+        return new ProviderModel(
+            $this->name(),
+            $modelId,
+            fn(string $contract): Model => $this->resolveModel($modelId, $contract),
+        );
+    }
+
+    /** @param class-string<Model> $contract */
+    final protected function resolveModel(string $modelId, string $contract): Model
+    {
+        return match ($contract) {
+            TextModelInterface::class => $this->textModel($modelId),
+            ImageModelInterface::class => $this->imageModel($modelId),
+            SpeechModelInterface::class => $this->speechModel($modelId),
+            TranscriptionModelInterface::class => $this->transcriptionModel($modelId),
+            EmbeddingModelInterface::class => $this->embeddingModel($modelId),
+            VideoModelInterface::class => $this->videoModel($modelId),
+            LiveModelInterface::class => $this->liveModel($modelId),
+            default => throw NoSuchModelException::for($this->name(), $modelId, $contract),
+        };
+    }
+
+    protected function textModel(string $modelId): TextModelInterface
     {
         throw NoSuchModelException::for($this->name(), $modelId, 'textModel');
     }
 
-    public function imageModel(string $modelId): ImageModelInterface
+    protected function imageModel(string $modelId): ImageModelInterface
     {
         throw NoSuchModelException::for($this->name(), $modelId, 'imageModel');
     }
 
-    public function speechModel(string $modelId): SpeechModelInterface
+    protected function speechModel(string $modelId): SpeechModelInterface
     {
         throw NoSuchModelException::for($this->name(), $modelId, 'speechModel');
     }
 
-    public function embeddingModel(string $modelId): EmbeddingModelInterface
+    protected function transcriptionModel(string $modelId): TranscriptionModelInterface
+    {
+        throw NoSuchModelException::for($this->name(), $modelId, 'transcriptionModel');
+    }
+
+    protected function embeddingModel(string $modelId): EmbeddingModelInterface
     {
         throw NoSuchModelException::for($this->name(), $modelId, 'embeddingModel');
     }
 
-    public function videoModel(string $modelId): VideoModelInterface
+    protected function videoModel(string $modelId): VideoModelInterface
     {
         throw NoSuchModelException::for($this->name(), $modelId, 'videoModel');
     }
 
+    protected function liveModel(string $modelId): LiveModelInterface
+    {
+        throw NoSuchModelException::for($this->name(), $modelId, 'liveModel');
+    }
 }

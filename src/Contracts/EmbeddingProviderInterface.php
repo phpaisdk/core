@@ -4,7 +4,5 @@ declare(strict_types=1);
 
 namespace AiSdk\Contracts;
 
-interface EmbeddingProviderInterface extends ProviderInterface
-{
-    public function embeddingModel(string $modelId): EmbeddingModelInterface;
-}
+/** Marker for providers that resolve embedding adapters through model(). */
+interface EmbeddingProviderInterface extends ProviderInterface {}

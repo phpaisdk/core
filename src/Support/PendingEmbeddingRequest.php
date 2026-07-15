@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace AiSdk\Support;
 
 use AiSdk\Contracts\EmbeddingModelInterface;
+use AiSdk\Contracts\Model;
 use AiSdk\Exceptions\InvalidArgumentException;
 use AiSdk\Exceptions\InvalidResponseException;
 use AiSdk\Requests\EmbeddingRequest;
@@ -20,9 +21,9 @@ final class PendingEmbeddingRequest
     /** @var array<string, array<string, mixed>> */
     private array $providerOptions = [];
 
-    public function __construct(private ?EmbeddingModelInterface $model = null) {}
+    public function __construct(private ?Model $model = null) {}
 
-    public function model(EmbeddingModelInterface $model): self
+    public function model(Model $model): self
     {
         $this->model = $model;
 

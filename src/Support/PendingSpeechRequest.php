@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace AiSdk\Support;
 
+use AiSdk\Contracts\Model;
 use AiSdk\Contracts\SpeechModelInterface;
 use AiSdk\Exceptions\InvalidArgumentException;
 use AiSdk\Requests\SpeechRequest;
@@ -18,9 +19,9 @@ final class PendingSpeechRequest
     /** @var array<string, array<string, mixed>> */
     private array $providerOptions = [];
 
-    public function __construct(private ?SpeechModelInterface $model = null) {}
+    public function __construct(private ?Model $model = null) {}
 
-    public function model(SpeechModelInterface $model): self
+    public function model(Model $model): self
     {
         $this->model = $model;
 

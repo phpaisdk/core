@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace AiSdk\Support;
 
 use AiSdk\Content;
+use AiSdk\Contracts\Model;
 use AiSdk\Contracts\VideoModelInterface;
 use AiSdk\Exceptions\InvalidArgumentException;
 use AiSdk\Exceptions\TimeoutException;
@@ -39,9 +40,9 @@ final class PendingVideoRequest
     /** @var array<string, array<string, mixed>> */
     private array $providerOptions = [];
 
-    public function __construct(private ?VideoModelInterface $model = null) {}
+    public function __construct(private ?Model $model = null) {}
 
-    public function model(VideoModelInterface $model): self
+    public function model(Model $model): self
     {
         $this->model = $model;
 

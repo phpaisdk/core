@@ -32,12 +32,12 @@ final class Sdk
         public readonly ?ContainerInterface $container = null,
         public readonly string $userAgent = 'aisdk-php/1.0',
         public readonly ?Model $defaultModel = null,
-        public readonly ?TextModelInterface $defaultTextModel = null,
-        public readonly ?ImageModelInterface $defaultImageModel = null,
-        public readonly ?SpeechModelInterface $defaultSpeechModel = null,
-        public readonly ?EmbeddingModelInterface $defaultEmbeddingModel = null,
-        public readonly ?VideoModelInterface $defaultVideoModel = null,
-        public readonly ?TranscriptionModelInterface $defaultTranscriptionModel = null,
+        public readonly ?Model $defaultTextModel = null,
+        public readonly ?Model $defaultImageModel = null,
+        public readonly ?Model $defaultSpeechModel = null,
+        public readonly ?Model $defaultEmbeddingModel = null,
+        public readonly ?Model $defaultVideoModel = null,
+        public readonly ?Model $defaultTranscriptionModel = null,
     ) {}
 
     public function withDefaultModel(Model $model): self
@@ -59,67 +59,151 @@ final class Sdk
         );
     }
 
-    public function withDefaultTextModel(TextModelInterface $model): self
+    public function withDefaultTextModel(Model $model): self
     {
-        return $this->withDefaultModel($model);
+        return new self(
+            httpClient: $this->httpClient,
+            requestFactory: $this->requestFactory,
+            streamFactory: $this->streamFactory,
+            logger: $this->logger,
+            container: $this->container,
+            userAgent: $this->userAgent,
+            defaultModel: $this->defaultModel,
+            defaultTextModel: $model,
+            defaultImageModel: $this->defaultImageModel,
+            defaultSpeechModel: $this->defaultSpeechModel,
+            defaultTranscriptionModel: $this->defaultTranscriptionModel,
+            defaultEmbeddingModel: $this->defaultEmbeddingModel,
+            defaultVideoModel: $this->defaultVideoModel,
+        );
     }
 
-    public function withDefaultImageModel(ImageModelInterface $model): self
+    public function withDefaultImageModel(Model $model): self
     {
-        return $this->withDefaultModel($model);
+        return new self(
+            httpClient: $this->httpClient,
+            requestFactory: $this->requestFactory,
+            streamFactory: $this->streamFactory,
+            logger: $this->logger,
+            container: $this->container,
+            userAgent: $this->userAgent,
+            defaultModel: $this->defaultModel,
+            defaultTextModel: $this->defaultTextModel,
+            defaultImageModel: $model,
+            defaultSpeechModel: $this->defaultSpeechModel,
+            defaultTranscriptionModel: $this->defaultTranscriptionModel,
+            defaultEmbeddingModel: $this->defaultEmbeddingModel,
+            defaultVideoModel: $this->defaultVideoModel,
+        );
     }
 
-    public function withDefaultSpeechModel(SpeechModelInterface $model): self
+    public function withDefaultSpeechModel(Model $model): self
     {
-        return $this->withDefaultModel($model);
+        return new self(
+            httpClient: $this->httpClient,
+            requestFactory: $this->requestFactory,
+            streamFactory: $this->streamFactory,
+            logger: $this->logger,
+            container: $this->container,
+            userAgent: $this->userAgent,
+            defaultModel: $this->defaultModel,
+            defaultTextModel: $this->defaultTextModel,
+            defaultImageModel: $this->defaultImageModel,
+            defaultSpeechModel: $model,
+            defaultTranscriptionModel: $this->defaultTranscriptionModel,
+            defaultEmbeddingModel: $this->defaultEmbeddingModel,
+            defaultVideoModel: $this->defaultVideoModel,
+        );
     }
 
-    public function withDefaultTranscriptionModel(TranscriptionModelInterface $model): self
+    public function withDefaultTranscriptionModel(Model $model): self
     {
-        return $this->withDefaultModel($model);
+        return new self(
+            httpClient: $this->httpClient,
+            requestFactory: $this->requestFactory,
+            streamFactory: $this->streamFactory,
+            logger: $this->logger,
+            container: $this->container,
+            userAgent: $this->userAgent,
+            defaultModel: $this->defaultModel,
+            defaultTextModel: $this->defaultTextModel,
+            defaultImageModel: $this->defaultImageModel,
+            defaultSpeechModel: $this->defaultSpeechModel,
+            defaultTranscriptionModel: $model,
+            defaultEmbeddingModel: $this->defaultEmbeddingModel,
+            defaultVideoModel: $this->defaultVideoModel,
+        );
     }
 
-    public function withDefaultEmbeddingModel(EmbeddingModelInterface $model): self
+    public function withDefaultEmbeddingModel(Model $model): self
     {
-        return $this->withDefaultModel($model);
+        return new self(
+            httpClient: $this->httpClient,
+            requestFactory: $this->requestFactory,
+            streamFactory: $this->streamFactory,
+            logger: $this->logger,
+            container: $this->container,
+            userAgent: $this->userAgent,
+            defaultModel: $this->defaultModel,
+            defaultTextModel: $this->defaultTextModel,
+            defaultImageModel: $this->defaultImageModel,
+            defaultSpeechModel: $this->defaultSpeechModel,
+            defaultTranscriptionModel: $this->defaultTranscriptionModel,
+            defaultEmbeddingModel: $model,
+            defaultVideoModel: $this->defaultVideoModel,
+        );
     }
 
-    public function withDefaultVideoModel(VideoModelInterface $model): self
+    public function withDefaultVideoModel(Model $model): self
     {
-        return $this->withDefaultModel($model);
+        return new self(
+            httpClient: $this->httpClient,
+            requestFactory: $this->requestFactory,
+            streamFactory: $this->streamFactory,
+            logger: $this->logger,
+            container: $this->container,
+            userAgent: $this->userAgent,
+            defaultModel: $this->defaultModel,
+            defaultTextModel: $this->defaultTextModel,
+            defaultImageModel: $this->defaultImageModel,
+            defaultSpeechModel: $this->defaultSpeechModel,
+            defaultTranscriptionModel: $this->defaultTranscriptionModel,
+            defaultEmbeddingModel: $this->defaultEmbeddingModel,
+            defaultVideoModel: $model,
+        );
     }
 
     public function video(?string $prompt = null): PendingVideoRequest
     {
-        $request = new PendingVideoRequest($this->defaultVideoModel);
+        $request = new PendingVideoRequest($this->defaultVideoModel ?? $this->defaultModel);
 
         return $prompt === null ? $request : $request->prompt($prompt);
     }
 
     public function text(?string $prompt = null): PendingTextRequest
     {
-        $request = new PendingTextRequest($this->defaultTextModel, $this->container);
+        $request = new PendingTextRequest($this->defaultTextModel ?? $this->defaultModel, $this->container);
 
         return $prompt === null ? $request : $request->prompt($prompt);
     }
 
     public function image(?string $prompt = null): PendingImageRequest
     {
-        $request = new PendingImageRequest($this->defaultImageModel);
+        $request = new PendingImageRequest($this->defaultImageModel ?? $this->defaultModel);
 
         return $prompt === null ? $request : $request->prompt($prompt);
     }
 
     public function speech(?string $input = null): PendingSpeechRequest
     {
-        $request = new PendingSpeechRequest($this->defaultSpeechModel);
+        $request = new PendingSpeechRequest($this->defaultSpeechModel ?? $this->defaultModel);
 
         return $input === null ? $request : $request->input($input);
     }
 
     public function transcription(?Content $audio = null): PendingTranscriptionRequest
     {
-        $request = new PendingTranscriptionRequest($this->defaultTranscriptionModel);
+        $request = new PendingTranscriptionRequest($this->defaultTranscriptionModel ?? $this->defaultModel);
 
         return $audio === null ? $request : $request->audio($audio);
     }
@@ -129,7 +213,7 @@ final class Sdk
      */
     public function embedding(string|array|null $input = null): PendingEmbeddingRequest
     {
-        $request = new PendingEmbeddingRequest($this->defaultEmbeddingModel);
+        $request = new PendingEmbeddingRequest($this->defaultEmbeddingModel ?? $this->defaultModel);
 
         return $input === null ? $request : $request->input($input);
     }

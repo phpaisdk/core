@@ -4,7 +4,5 @@ declare(strict_types=1);
 
 namespace AiSdk\Contracts;
 
-interface ImageProviderInterface extends ProviderInterface
-{
-    public function imageModel(string $modelId): ImageModelInterface;
-}
+/** Marker for providers that resolve image adapters through model(). */
+interface ImageProviderInterface extends ProviderInterface {}

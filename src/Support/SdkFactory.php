@@ -32,12 +32,12 @@ final class SdkFactory
     private ?ContainerInterface $container = null;
     private string $userAgent = 'aisdk-php/1.0';
     private ?Model $defaultModel = null;
-    private ?TextModelInterface $defaultTextModel = null;
-    private ?ImageModelInterface $defaultImageModel = null;
-    private ?SpeechModelInterface $defaultSpeechModel = null;
-    private ?TranscriptionModelInterface $defaultTranscriptionModel = null;
-    private ?EmbeddingModelInterface $defaultEmbeddingModel = null;
-    private ?VideoModelInterface $defaultVideoModel = null;
+    private ?Model $defaultTextModel = null;
+    private ?Model $defaultImageModel = null;
+    private ?Model $defaultSpeechModel = null;
+    private ?Model $defaultTranscriptionModel = null;
+    private ?Model $defaultEmbeddingModel = null;
+    private ?Model $defaultVideoModel = null;
     private float $connectTimeout = 10.0;
     private float $timeout = 120.0;
 
@@ -131,34 +131,46 @@ final class SdkFactory
         return $this;
     }
 
-    public function withDefaultTextModel(TextModelInterface $model): self
+    public function withDefaultTextModel(Model $model): self
     {
-        return $this->withDefaultModel($model);
+        $this->defaultTextModel = $model;
+
+        return $this;
     }
 
-    public function withDefaultImageModel(ImageModelInterface $model): self
+    public function withDefaultImageModel(Model $model): self
     {
-        return $this->withDefaultModel($model);
+        $this->defaultImageModel = $model;
+
+        return $this;
     }
 
-    public function withDefaultSpeechModel(SpeechModelInterface $model): self
+    public function withDefaultSpeechModel(Model $model): self
     {
-        return $this->withDefaultModel($model);
+        $this->defaultSpeechModel = $model;
+
+        return $this;
     }
 
-    public function withDefaultTranscriptionModel(TranscriptionModelInterface $model): self
+    public function withDefaultTranscriptionModel(Model $model): self
     {
-        return $this->withDefaultModel($model);
+        $this->defaultTranscriptionModel = $model;
+
+        return $this;
     }
 
-    public function withDefaultEmbeddingModel(EmbeddingModelInterface $model): self
+    public function withDefaultEmbeddingModel(Model $model): self
     {
-        return $this->withDefaultModel($model);
+        $this->defaultEmbeddingModel = $model;
+
+        return $this;
     }
 
-    public function withDefaultVideoModel(VideoModelInterface $model): self
+    public function withDefaultVideoModel(Model $model): self
     {
-        return $this->withDefaultModel($model);
+        $this->defaultVideoModel = $model;
+
+        return $this;
     }
 
     public function defaultModel(): ?Model
@@ -166,32 +178,32 @@ final class SdkFactory
         return $this->defaultModel;
     }
 
-    public function defaultTextModel(): ?TextModelInterface
+    public function defaultTextModel(): ?Model
     {
         return $this->defaultTextModel;
     }
 
-    public function defaultImageModel(): ?ImageModelInterface
+    public function defaultImageModel(): ?Model
     {
         return $this->defaultImageModel;
     }
 
-    public function defaultSpeechModel(): ?SpeechModelInterface
+    public function defaultSpeechModel(): ?Model
     {
         return $this->defaultSpeechModel;
     }
 
-    public function defaultTranscriptionModel(): ?TranscriptionModelInterface
+    public function defaultTranscriptionModel(): ?Model
     {
         return $this->defaultTranscriptionModel;
     }
 
-    public function defaultEmbeddingModel(): ?EmbeddingModelInterface
+    public function defaultEmbeddingModel(): ?Model
     {
         return $this->defaultEmbeddingModel;
     }
 
-    public function defaultVideoModel(): ?VideoModelInterface
+    public function defaultVideoModel(): ?Model
     {
         return $this->defaultVideoModel;
     }

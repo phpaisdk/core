@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace AiSdk\Support;
 
+use AiSdk\Contracts\Model;
 use AiSdk\Contracts\TextModelInterface;
 use AiSdk\Exceptions\InvalidArgumentException;
 use AiSdk\Exceptions\NoSuchToolException;
@@ -36,12 +37,12 @@ final class PendingTextRequest
 
     private ?Output $output = null;
 
-    public function __construct(private ?TextModelInterface $model = null, ?ContainerInterface $container = null)
+    public function __construct(private ?Model $model = null, ?ContainerInterface $container = null)
     {
         $this->toolContainer = $container;
     }
 
-    public function model(TextModelInterface $model): self
+    public function model(Model $model): self
     {
         $this->model = $model;
 

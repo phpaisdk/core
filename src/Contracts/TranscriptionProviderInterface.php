@@ -4,7 +4,5 @@ declare(strict_types=1);
 
 namespace AiSdk\Contracts;
 
-interface TranscriptionProviderInterface extends ProviderInterface
-{
-    public function transcriptionModel(string $modelId): TranscriptionModelInterface;
-}
+/** Marker for providers that resolve transcription adapters through model(). */
+interface TranscriptionProviderInterface extends ProviderInterface {}
