@@ -500,14 +500,13 @@ expect($result->text)->toBe('Hello!');
 Embedding tests can use `AiSdk\Testing\Fakes\FakeEmbeddingModel` in the same way.
 Transcription tests can use `AiSdk\Testing\Fakes\FakeTranscriptionModel`.
 
-## Links
+## Documentation
 
-- [Project Documentation](https://github.com/phpaisdk)
-- [Transport Package](https://github.com/phpaisdk/transport)
-- [OpenAI Provider](https://github.com/phpaisdk/openai)
-- [xAI Provider](https://github.com/phpaisdk/xai)
-- [Google Provider](https://github.com/phpaisdk/google)
-- [Azure Provider](https://github.com/phpaisdk/azure)
-- [Amazon Bedrock Provider](https://github.com/phpaisdk/bedrock)
-- [ElevenLabs Provider](https://github.com/phpaisdk/elevenlabs)
-- [Anthropic Provider](https://github.com/phpaisdk/anthropic)
+- [PHP AI SDK documentation](https://phpaisdk.com/docs)
+- [Core documentation](https://phpaisdk.com/docs)
+
+## Community
+
+- [Contributing](https://github.com/phpaisdk/.github/blob/main/CONTRIBUTING.md)
+- [Support](https://github.com/phpaisdk/.github/blob/main/SUPPORT.md)
+- For private security reports, email [security@phpaisdk.com](mailto:security@phpaisdk.com).
