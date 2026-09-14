@@ -57,3 +57,16 @@ it('rejects additional object properties', function () {
 
     SchemaValidator::validate($schema, ['name' => 'Ada', 'extra' => true]);
 })->throws(SchemaValidationException::class);
+
+it('serializes empty object properties as a JSON object', function () {
+    $schema = Schema::object('filters')->jsonSchema();
+
+    expect($schema['properties'])->toBeInstanceOf(stdClass::class);
+});
+
+it('keeps nullable enum schemas and validation aligned', function () {
+    $schema = Schema::enum(['draft', 'published'], 'status')->nullable();
+
+    expect($schema->jsonSchema()['enum'])->toBe(['draft', 'published', null])
+        ->and(SchemaValidator::validate($schema, null))->toBeNull();
+});

@@ -18,7 +18,7 @@ final class Json
         if (! is_array($decoded)) {
             throw new JsonException(
                 message: 'Expected JSON to decode to array' . ($context !== null ? " ({$context})" : '') . '.',
-                context: ['raw' => mb_substr($json, 0, 1024)],
+                context: ['raw' => substr($json, 0, 1024)],
             );
         }
 
@@ -32,7 +32,7 @@ final class Json
         } catch (\JsonException $e) {
             throw new JsonException(
                 message: 'Failed to decode JSON' . ($context !== null ? " ({$context})" : '') . ': ' . $e->getMessage(),
-                context: ['raw' => mb_substr($json, 0, 1024)],
+                context: ['raw' => substr($json, 0, 1024)],
                 previous: $e,
             );
         }

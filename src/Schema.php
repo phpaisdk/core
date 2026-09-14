@@ -204,11 +204,11 @@ final class Schema
         }
 
         if ($type === self::TYPE_OBJECT) {
-            $schema['properties'] = [];
+            $properties = [];
             $required = [];
 
             foreach ($this->properties() as $name => $property) {
-                $schema['properties'][$name] = $property->jsonSchema();
+                $properties[$name] = $property->jsonSchema();
                 if ($property->isRequired()) {
                     $required[] = $name;
                 }
@@ -218,6 +218,7 @@ final class Schema
                 $schema['required'] = $required;
             }
 
+            $schema['properties'] = $properties === [] ? new \stdClass() : $properties;
             $schema['additionalProperties'] = false;
         }
 
@@ -226,6 +227,10 @@ final class Schema
         }
 
         if (($enum = $this->enumValues()) !== null) {
+            if ($this->nullable && ! in_array(null, $enum, true)) {
+                $enum[] = null;
+            }
+
             $schema['enum'] = $enum;
         }
 
