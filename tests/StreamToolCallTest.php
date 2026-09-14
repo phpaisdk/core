@@ -53,6 +53,21 @@ it('keeps separate tool calls distinct by index', function () {
     expect($result->toolCalls[1]->arguments)->toBe(['y' => 2]);
 });
 
+it('keeps tool calls from separate steps when providers reuse an index', function () {
+    $stream = streamFrom([
+        new ToolCallStartPart(0, 'call_first', 'first'),
+        new ToolCallDeltaPart(0, '{}'),
+        new ToolCallStartPart(0, 'call_second', 'second'),
+        new ToolCallDeltaPart(0, '{}'),
+        new FinishPart(FinishReason::ToolCalls, Usage::empty()),
+    ]);
+
+    expect($stream->run()->toolCalls)->toMatchArray([
+        new \AiSdk\ToolCall('call_first', 'first', []),
+        new \AiSdk\ToolCall('call_second', 'second', []),
+    ]);
+});
+
 it('accumulates text deltas and fires onChunk', function () {
     $chunks = [];
     $stream = streamFrom([

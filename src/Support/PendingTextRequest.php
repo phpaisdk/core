@@ -15,6 +15,7 @@ use AiSdk\Responses\TextModelResponse;
 use AiSdk\Results\TextResult;
 use AiSdk\Schema;
 use AiSdk\Streaming\Stream;
+use AiSdk\Streaming\StreamState;
 use AiSdk\Support\Concerns\ConfiguresGeneration;
 use AiSdk\Support\Concerns\HasMessages;
 use AiSdk\Support\Concerns\HasProviderOptions;
@@ -64,14 +65,16 @@ final class PendingTextRequest
         $messages = $request->messages;
         $toolCalls = [];
         $toolResults = [];
+        $totalUsage = Usage::empty();
         $response = null;
 
         for ($step = 1; $step <= $request->maxSteps; $step++) {
             $response = $model->generate($request->withMessages($messages));
+            $totalUsage = $totalUsage->add($response->usage);
             $calls = $response->toolCalls();
 
             if ($calls === []) {
-                return $this->resultFromResponse($response, $toolCalls, $toolResults);
+                return $this->resultFromResponse($response, $toolCalls, $toolResults, $totalUsage);
             }
 
             array_push($toolCalls, ...$calls);
@@ -92,7 +95,7 @@ final class PendingTextRequest
             throw new InvalidArgumentException('Generate::text() requires at least one step.');
         }
 
-        return $this->resultFromResponse($response, $toolCalls, $toolResults);
+        return $this->resultFromResponse($response, $toolCalls, $toolResults, $totalUsage);
     }
 
     public function stream(): Stream
@@ -104,7 +107,60 @@ final class PendingTextRequest
             'Generate::text()->stream()',
         );
 
-        return new Stream($model->stream($request));
+        $toolCalls = [];
+        $toolResults = [];
+        $totalUsage = Usage::empty();
+        $finalState = null;
+
+        $parts = (function () use ($model, $request, &$toolCalls, &$toolResults, &$totalUsage, &$finalState): \Generator {
+            $messages = $request->messages;
+
+            for ($step = 1; $step <= $request->maxSteps; $step++) {
+                $state = new StreamState();
+
+                foreach ($model->stream($request->withMessages($messages)) as $part) {
+                    $state->record($part);
+                    yield $part;
+                }
+
+                $finalState = $state;
+                $totalUsage = $totalUsage->add($state->usage());
+                $calls = $state->toolCalls();
+
+                if ($calls === []) {
+                    return;
+                }
+
+                array_push($toolCalls, ...$calls);
+                $messages[] = Message::assistant($state->text(), toolCalls: $calls);
+
+                foreach ($calls as $call) {
+                    $result = $this->executeToolCall($call, $request->tools, $messages);
+                    $toolResults[] = $result;
+                    $messages[] = Message::tool(
+                        toolCallId: $result->toolCallId,
+                        output: is_string($result->output) ? $result->output : Json::encode($result->output),
+                        name: $result->toolName,
+                    );
+                }
+            }
+        })();
+
+        return new Stream($parts, function (StreamState $state) use (&$toolCalls, &$toolResults, &$totalUsage, &$finalState): TextResult {
+            $final = $finalState instanceof StreamState ? $finalState : $state;
+
+            return new TextResult(
+                text: $final->text(),
+                reasoning: $final->reasoning(),
+                output: $this->decodeStructured($final->text()),
+                toolCalls: $toolCalls === [] ? $final->toolCalls() : $toolCalls,
+                toolResults: $toolResults,
+                finishReason: $final->finishReason(),
+                usage: $final->usage(),
+                providerMetadata: $final->providerMetadata(),
+                totalUsage: $totalUsage,
+            );
+        });
     }
 
     private function request(): TextModelRequest
@@ -132,7 +188,7 @@ final class PendingTextRequest
      * @param  array<int, ToolCall>  $toolCalls
      * @param  array<int, ToolResult>  $toolResults
      */
-    private function resultFromResponse(TextModelResponse $response, array $toolCalls, array $toolResults): TextResult
+    private function resultFromResponse(TextModelResponse $response, array $toolCalls, array $toolResults, Usage $totalUsage): TextResult
     {
         return new TextResult(
             text: $response->text(),
@@ -144,6 +200,7 @@ final class PendingTextRequest
             usage: $response->usage,
             rawResponse: $response->rawResponse,
             providerMetadata: $response->providerMetadata,
+            totalUsage: $totalUsage,
         );
     }
 

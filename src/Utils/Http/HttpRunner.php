@@ -137,6 +137,7 @@ final class HttpRunner
             if ($stream && $this->client instanceof GuzzleClientInterface) {
                 return $this->client->send($request, [
                     'allow_redirects' => false,
+                    'http_errors' => false,
                     'stream' => true,
                 ]);
             }

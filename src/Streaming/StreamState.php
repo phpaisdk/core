@@ -22,6 +22,11 @@ final class StreamState
     /** @var array<int, array{id: string, name: string, args: string}> */
     private array $toolCalls = [];
 
+    /** @var array<int, int> */
+    private array $activeToolCallSlots = [];
+
+    private int $nextToolCall = 0;
+
     private ?Usage $usage = null;
     private ?FinishReason $finishReason = null;
 
@@ -85,7 +90,9 @@ final class StreamState
 
     private function startToolCall(ToolCallStartPart $part): void
     {
-        $this->toolCalls[$part->index] = [
+        $key = $this->nextToolCall++;
+        $this->activeToolCallSlots[$part->index] = $key;
+        $this->toolCalls[$key] = [
             'id' => $part->id,
             'name' => $part->name,
             'args' => '',
@@ -94,22 +101,26 @@ final class StreamState
 
     private function appendToolCall(ToolCallDeltaPart $part): void
     {
-        if (! isset($this->toolCalls[$part->index])) {
-            $this->toolCalls[$part->index] = [
+        $key = $this->activeToolCallSlots[$part->index] ?? null;
+
+        if ($key === null) {
+            $key = $this->nextToolCall++;
+            $this->activeToolCallSlots[$part->index] = $key;
+            $this->toolCalls[$key] = [
                 'id' => $part->id ?? '',
                 'name' => $part->name ?? '',
                 'args' => '',
             ];
         }
 
-        if ($part->id !== null && $this->toolCalls[$part->index]['id'] === '') {
-            $this->toolCalls[$part->index]['id'] = $part->id;
+        if ($part->id !== null && $this->toolCalls[$key]['id'] === '') {
+            $this->toolCalls[$key]['id'] = $part->id;
         }
-        if ($part->name !== null && $this->toolCalls[$part->index]['name'] === '') {
-            $this->toolCalls[$part->index]['name'] = $part->name;
+        if ($part->name !== null && $this->toolCalls[$key]['name'] === '') {
+            $this->toolCalls[$key]['name'] = $part->name;
         }
 
-        $this->toolCalls[$part->index]['args'] .= $part->argsJson;
+        $this->toolCalls[$key]['args'] .= $part->argsJson;
     }
 
     private function finish(FinishPart $part): void

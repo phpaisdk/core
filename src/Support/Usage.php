@@ -22,4 +22,24 @@ final class Usage
     {
         return new self(0, 0, 0);
     }
+
+    public function add(self $usage): self
+    {
+        return new self(
+            inputTokens: $this->inputTokens + $usage->inputTokens,
+            outputTokens: $this->outputTokens + $usage->outputTokens,
+            totalTokens: $this->totalTokens + $usage->totalTokens,
+            reasoningTokens: self::sumNullable($this->reasoningTokens, $usage->reasoningTokens),
+            cachedInputTokens: self::sumNullable($this->cachedInputTokens, $usage->cachedInputTokens),
+        );
+    }
+
+    private static function sumNullable(?int $left, ?int $right): ?int
+    {
+        if ($left === null && $right === null) {
+            return null;
+        }
+
+        return ($left ?? 0) + ($right ?? 0);
+    }
 }

@@ -27,7 +27,11 @@ final class TextResult extends Result
         Usage $usage = new Usage(),
         public readonly array $rawResponse = [],
         array $providerMetadata = [],
+        ?Usage $totalUsage = null,
     ) {
         parent::__construct($usage, $providerMetadata);
+        $this->totalUsage = $totalUsage ?? $usage;
     }
+
+    public readonly Usage $totalUsage;
 }

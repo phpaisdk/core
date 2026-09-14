@@ -43,8 +43,9 @@ final class Stream implements IteratorAggregate
 
     /**
      * @param  Generator<int, StreamPart>  $parts
+     * @param  null|callable(StreamState): TextResult  $resultFactory
      */
-    public function __construct(private readonly Generator $parts)
+    public function __construct(private readonly Generator $parts, private readonly mixed $resultFactory = null)
     {
         $this->state = new StreamState();
     }
@@ -115,12 +116,6 @@ final class Stream implements IteratorAggregate
                 $this->advanceSource = true;
 
                 if ($part instanceof ErrorPart) {
-                    if ($this->onError !== null) {
-                        ($this->onError)($part->error);
-
-                        continue;
-                    }
-
                     throw $part->error;
                 }
 
@@ -187,6 +182,10 @@ final class Stream implements IteratorAggregate
 
     public function result(): TextResult
     {
+        if ($this->complete && is_callable($this->resultFactory)) {
+            return ($this->resultFactory)($this->state);
+        }
+
         return new TextResult(
             text: $this->state->text(),
             reasoning: $this->state->reasoning(),
