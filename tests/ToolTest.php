@@ -103,7 +103,6 @@ it('resolves class-based tools through the configured container', function () {
         ->tool(InjectedWeatherTool::class);
 
     $property = new ReflectionProperty($request, 'tools');
-    $property->setAccessible(true);
     $tools = $property->getValue($request);
 
     expect($tools)->toHaveCount(1)
