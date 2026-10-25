@@ -60,3 +60,22 @@ it('forwards typed input to the selected provider adapter', function () {
 
     expect($result->text)->toBe('ok');
 });
+
+it('leaves generation options unset unless the caller provides them', function () {
+    $model = FakeTextModel::text('ok');
+
+    Generate::text('Hello')->model($model)->run();
+
+    expect($model->requests[0]->maxTokens)->toBeNull()
+        ->and($model->requests[0]->temperature)->toBeNull()
+        ->and($model->requests[0]->topP)->toBeNull();
+});
+
+it('passes explicit generation options through, including zero', function () {
+    $model = FakeTextModel::text('ok');
+
+    Generate::text('Hello')->model($model)->maxTokens(256)->temperature(0.0)->run();
+
+    expect($model->requests[0]->maxTokens)->toBe(256)
+        ->and($model->requests[0]->temperature)->toBe(0.0);
+});
