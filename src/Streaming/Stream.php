@@ -37,6 +37,8 @@ final class Stream implements IteratorAggregate
 
     private bool $complete = false;
 
+    private ?TextResult $finalResult = null;
+
     private ?Throwable $failure = null;
 
     private bool $advanceSource = false;
@@ -129,6 +131,9 @@ final class Stream implements IteratorAggregate
                 yield $part;
             }
 
+            $this->finalResult = is_callable($this->resultFactory)
+                ? ($this->resultFactory)($this->state)
+                : $this->snapshot();
             $this->complete = true;
 
             if ($this->onToolCall !== null) {
@@ -182,10 +187,25 @@ final class Stream implements IteratorAggregate
 
     public function result(): TextResult
     {
-        if ($this->complete && is_callable($this->resultFactory)) {
-            return ($this->resultFactory)($this->state);
+        if ($this->failure !== null) {
+            throw $this->failure;
         }
 
+        if (! $this->complete || $this->finalResult === null) {
+            throw new \LogicException('The stream is not complete. Consume it or call run(); use snapshot() for partial output.');
+        }
+
+        return $this->finalResult;
+    }
+
+    public function isComplete(): bool
+    {
+        return $this->complete && $this->failure === null;
+    }
+
+    /** Partial accumulated output, without structured-output validation. */
+    public function snapshot(): TextResult
+    {
         return new TextResult(
             text: $this->state->text(),
             reasoning: $this->state->reasoning(),
