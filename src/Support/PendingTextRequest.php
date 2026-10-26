@@ -7,22 +7,22 @@ namespace AiSdk\Support;
 use AiSdk\Contracts\Model;
 use AiSdk\Contracts\TextModelInterface;
 use AiSdk\Exceptions\InvalidArgumentException;
-use AiSdk\Exceptions\NoSuchToolException;
 use AiSdk\Message;
 use AiSdk\Outputs\Output;
 use AiSdk\Requests\TextModelRequest;
 use AiSdk\Responses\TextModelResponse;
+use AiSdk\Results\StepResult;
 use AiSdk\Results\TextResult;
 use AiSdk\Schema;
 use AiSdk\Streaming\Stream;
 use AiSdk\Streaming\StreamState;
 use AiSdk\Support\Concerns\ConfiguresGeneration;
+use AiSdk\Support\Concerns\ControlsToolLoop;
 use AiSdk\Support\Concerns\HasMessages;
 use AiSdk\Support\Concerns\HasProviderOptions;
 use AiSdk\Support\Concerns\HasTools;
 use AiSdk\Tool;
 use AiSdk\ToolCall;
-use AiSdk\ToolExecutionContext;
 use AiSdk\ToolResult;
 use Psr\Container\ContainerInterface;
 
@@ -34,6 +34,7 @@ final class PendingTextRequest
     use ConfiguresGeneration;
     use HasMessages;
     use HasProviderOptions;
+    use ControlsToolLoop;
     use HasTools;
 
     private ?Output $output = null;
@@ -61,6 +62,7 @@ final class PendingTextRequest
     {
         $request = $this->request();
         $model = ModelResolver::resolve($this->model, TextModelInterface::class, 'Generate::text()');
+        $executor = $this->executor($request->tools);
 
         $messages = $request->messages;
         $toolCalls = [];
@@ -72,22 +74,25 @@ final class PendingTextRequest
             $response = $model->generate($request->withMessages($messages));
             $totalUsage = $totalUsage->add($response->usage);
             $calls = $response->toolCalls();
+            $results = [];
 
-            if ($calls === []) {
-                return $this->resultFromResponse($response, $toolCalls, $toolResults, $totalUsage);
+            if ($calls !== []) {
+                array_push($toolCalls, ...$calls);
+                $messages[] = Message::assistant($response->text(), toolCalls: $calls);
+
+                foreach ($calls as $call) {
+                    $result = $executor->execute($call, $messages);
+                    $results[] = $result;
+                    $messages[] = $this->toolMessage($result);
+                }
+
+                array_push($toolResults, ...$results);
             }
 
-            array_push($toolCalls, ...$calls);
-            $messages[] = Message::assistant($response->text(), toolCalls: $calls);
+            $stop = $this->stepFinished(new StepResult($step, $response->text(), $calls, $results, $response->finishReason, $response->usage));
 
-            foreach ($calls as $call) {
-                $result = $this->executeToolCall($call, $request->tools, $messages);
-                $toolResults[] = $result;
-                $messages[] = Message::tool(
-                    toolCallId: $result->toolCallId,
-                    output: is_string($result->output) ? $result->output : Json::encode($result->output),
-                    name: $result->toolName,
-                );
+            if ($calls === [] || $stop) {
+                return $this->resultFromResponse($response, $toolCalls, $toolResults, $totalUsage);
             }
         }
 
@@ -106,13 +111,14 @@ final class PendingTextRequest
             TextModelInterface::class,
             'Generate::text()->stream()',
         );
+        $executor = $this->executor($request->tools);
 
         $toolCalls = [];
         $toolResults = [];
         $totalUsage = Usage::empty();
         $finalState = null;
 
-        $parts = (function () use ($model, $request, &$toolCalls, &$toolResults, &$totalUsage, &$finalState): \Generator {
+        $parts = (function () use ($model, $request, $executor, &$toolCalls, &$toolResults, &$totalUsage, &$finalState): \Generator {
             $messages = $request->messages;
 
             for ($step = 1; $step <= $request->maxSteps; $step++) {
@@ -126,22 +132,25 @@ final class PendingTextRequest
                 $finalState = $state;
                 $totalUsage = $totalUsage->add($state->usage());
                 $calls = $state->toolCalls();
+                $results = [];
 
-                if ($calls === []) {
-                    return;
+                if ($calls !== []) {
+                    array_push($toolCalls, ...$calls);
+                    $messages[] = Message::assistant($state->text(), toolCalls: $calls);
+
+                    foreach ($calls as $call) {
+                        $result = $executor->execute($call, $messages);
+                        $results[] = $result;
+                        $messages[] = $this->toolMessage($result);
+                    }
+
+                    array_push($toolResults, ...$results);
                 }
 
-                array_push($toolCalls, ...$calls);
-                $messages[] = Message::assistant($state->text(), toolCalls: $calls);
+                $stop = $this->stepFinished(new StepResult($step, $state->text(), $calls, $results, $state->finishReason(), $state->usage()));
 
-                foreach ($calls as $call) {
-                    $result = $this->executeToolCall($call, $request->tools, $messages);
-                    $toolResults[] = $result;
-                    $messages[] = Message::tool(
-                        toolCallId: $result->toolCallId,
-                        output: is_string($result->output) ? $result->output : Json::encode($result->output),
-                        name: $result->toolName,
-                    );
+                if ($calls === [] || $stop) {
+                    return;
                 }
             }
         })();
@@ -161,6 +170,23 @@ final class PendingTextRequest
                 totalUsage: $totalUsage,
             );
         });
+    }
+
+    /**
+     * @param  array<int, Tool>  $tools
+     */
+    private function executor(array $tools): ToolExecutor
+    {
+        return new ToolExecutor($tools, $this->throwOnToolError, $this->exposeToolErrors);
+    }
+
+    private function toolMessage(ToolResult $result): Message
+    {
+        return Message::tool(
+            toolCallId: $result->toolCallId,
+            output: is_string($result->output) ? $result->output : Json::encode($result->output),
+            name: $result->toolName,
+        );
     }
 
     private function request(): TextModelRequest
@@ -202,34 +228,6 @@ final class PendingTextRequest
             providerMetadata: $response->providerMetadata,
             totalUsage: $totalUsage,
         );
-    }
-
-    /**
-     * @param  array<int, Tool>  $tools
-     * @param  array<int, Message>  $messages
-     */
-    private function executeToolCall(ToolCall $call, array $tools, array $messages): ToolResult
-    {
-        $tool = null;
-        foreach ($tools as $candidate) {
-            if ($candidate->name() === $call->name) {
-                $tool = $candidate;
-                break;
-            }
-        }
-
-        if ($tool === null) {
-            throw NoSuchToolException::for($call->name);
-        }
-
-        $context = new ToolExecutionContext(
-            toolCallId: $call->id,
-            toolName: $call->name,
-            arguments: $call->arguments,
-            messages: $messages,
-        );
-
-        return new ToolResult($call->id, $tool->name(), $tool->call($call->arguments, $context));
     }
 
     private function decodeStructured(string $text): mixed

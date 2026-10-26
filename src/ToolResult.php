@@ -10,5 +10,6 @@ final class ToolResult
         public readonly string $toolCallId,
         public readonly string $toolName,
         public readonly mixed $output,
+        public readonly bool $isError = false,
     ) {}
 }
