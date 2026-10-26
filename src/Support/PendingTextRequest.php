@@ -9,6 +9,7 @@ use AiSdk\Contracts\TextModelInterface;
 use AiSdk\Exceptions\InvalidArgumentException;
 use AiSdk\Message;
 use AiSdk\Outputs\Output;
+use AiSdk\PromptCache;
 use AiSdk\Requests\TextModelRequest;
 use AiSdk\Responses\TextModelResponse;
 use AiSdk\Results\StepResult;
@@ -39,6 +40,8 @@ final class PendingTextRequest
 
     private ?Output $output = null;
 
+    private ?PromptCache $cache = null;
+
     public function __construct(private ?Model $model = null, ?ContainerInterface $container = null)
     {
         $this->toolContainer = $container;
@@ -47,6 +50,23 @@ final class PendingTextRequest
     public function model(Model $model): self
     {
         $this->model = $model;
+
+        return $this;
+    }
+
+    /**
+     * Ask the provider to cache the stable start of the prompt (instructions, tools and earlier messages).
+     *
+     * @param  PromptCache|string|bool  $cache  true for the default, '5m' or '1h' for a lifetime, or a PromptCache
+     */
+    public function cache(PromptCache|string|bool $cache = true): self
+    {
+        $this->cache = match (true) {
+            $cache instanceof PromptCache => $cache,
+            $cache === false => null,
+            $cache === true => PromptCache::auto(),
+            default => PromptCache::ttl($cache),
+        };
 
         return $this;
     }
@@ -207,6 +227,7 @@ final class PendingTextRequest
             maxSteps: $this->maxSteps,
             reasoning: $this->reasoning,
             providerOptions: $this->readProviderOptions(),
+            cache: $this->cache,
         );
     }
 

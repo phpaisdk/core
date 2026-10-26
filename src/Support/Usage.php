@@ -4,6 +4,12 @@ declare(strict_types=1);
 
 namespace AiSdk\Support;
 
+/**
+ * Token counts for one call.
+ *
+ * $inputTokens is the whole prompt, including tokens read from or written to a
+ * prompt cache; $cachedInputTokens and $cacheWriteInputTokens are subsets of it.
+ */
 final class Usage
 {
     public readonly int $totalTokens;
@@ -14,6 +20,7 @@ final class Usage
         ?int $totalTokens = null,
         public readonly ?int $reasoningTokens = null,
         public readonly ?int $cachedInputTokens = null,
+        public readonly ?int $cacheWriteInputTokens = null,
     ) {
         $this->totalTokens = $totalTokens ?? ($inputTokens + $outputTokens);
     }
@@ -31,7 +38,20 @@ final class Usage
             totalTokens: $this->totalTokens + $usage->totalTokens,
             reasoningTokens: self::sumNullable($this->reasoningTokens, $usage->reasoningTokens),
             cachedInputTokens: self::sumNullable($this->cachedInputTokens, $usage->cachedInputTokens),
+            cacheWriteInputTokens: self::sumNullable($this->cacheWriteInputTokens, $usage->cacheWriteInputTokens),
         );
+    }
+
+    /**
+     * Share of the prompt served from cache, or null when no cache data was reported.
+     */
+    public function cacheHitRate(): ?float
+    {
+        if ($this->cachedInputTokens === null || $this->inputTokens === 0) {
+            return null;
+        }
+
+        return $this->cachedInputTokens / $this->inputTokens;
     }
 
     private static function sumNullable(?int $left, ?int $right): ?int

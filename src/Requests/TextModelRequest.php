@@ -6,6 +6,7 @@ namespace AiSdk\Requests;
 
 use AiSdk\Message;
 use AiSdk\Outputs\Output;
+use AiSdk\PromptCache;
 use AiSdk\Reasoning;
 use AiSdk\Tool;
 use AiSdk\ToolChoice;
@@ -33,6 +34,7 @@ final class TextModelRequest
         public readonly int $maxSteps = 1,
         public readonly ?Reasoning $reasoning = null,
         public readonly array $providerOptions = [],
+        public readonly ?PromptCache $cache = null,
     ) {}
 
     /**
@@ -52,6 +54,7 @@ final class TextModelRequest
             maxSteps: $this->maxSteps,
             reasoning: $this->reasoning,
             providerOptions: $this->providerOptions,
+            cache: $this->cache,
         );
     }
 
