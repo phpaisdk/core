@@ -73,6 +73,20 @@ class Tool
     }
 
     /**
+     * Build a tool from a typed PHP callable. The model-facing schema comes from the
+     * signature: int, float, string, bool, array and backed enum parameters, nullable
+     * types, and defaults (parameters with defaults are optional).
+     *
+     *   Tool::fromCallable(fn (string $city, int $days = 3): string => ..., name: 'forecast', description: 'Weather forecast')
+     *
+     * Use #[Describe('...')] on the function or its parameters to explain them to the model.
+     */
+    public static function fromCallable(callable $callable, ?string $name = null, ?string $description = null): self
+    {
+        return Support\CallableTool::make($callable, $name, $description);
+    }
+
+    /**
      * @param  array<int, mixed>  $arguments
      */
     public static function __callStatic(string $method, array $arguments): self
