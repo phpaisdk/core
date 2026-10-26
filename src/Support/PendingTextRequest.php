@@ -38,6 +38,22 @@ final class PendingTextRequest
     use ControlsToolLoop;
     use HasTools;
 
+    /** @var \Closure(\AiSdk\Observability\ModelEvent): void|null */
+    private ?\Closure $observer = null;
+
+    /** @param callable(\AiSdk\Observability\ModelEvent): void $observer */
+    public function observe(callable $observer): self
+    {
+        $this->observer = \Closure::fromCallable($observer);
+
+        return $this;
+    }
+
+    private function observed(TextModelInterface $model): TextModelInterface
+    {
+        return $this->observer === null ? $model : new \AiSdk\Observability\ObservedTextModel($model, $this->observer);
+    }
+
     private ?Output $output = null;
 
     private ?PromptCache $cache = null;
@@ -82,6 +98,7 @@ final class PendingTextRequest
     {
         $request = $this->request();
         $model = ModelResolver::resolve($this->model, TextModelInterface::class, 'Generate::text()');
+        $model = $this->observed($model);
         $executor = $this->executor($request->tools);
 
         $messages = $request->messages;
@@ -131,6 +148,7 @@ final class PendingTextRequest
             TextModelInterface::class,
             'Generate::text()->stream()',
         );
+        $model = $this->observed($model);
         $executor = $this->executor($request->tools);
 
         $toolCalls = [];
