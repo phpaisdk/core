@@ -23,6 +23,13 @@ foreach (['XAI_API_KEY', 'CONCENTRATE_API_KEY'] as $name) {
     }
 }
 
+if (getenv('AISDK_LIVE_XAI_ALL') === '1') {
+    $transportAutoload = dirname(__DIR__, 2) . '/transport/vendor/autoload.php';
+    if (is_file($transportAutoload)) {
+        require $transportAutoload;
+    }
+}
+
 $runtime = require dirname(__DIR__) . '/vendor/autoload.php';
 $runtime->unregister();
 $runtime->register(true);
@@ -30,7 +37,7 @@ $runtime->register(true);
 $workspace = dirname(__DIR__, 2);
 $loader = new Composer\Autoload\ClassLoader();
 $loader->addPsr4('AiSdk\\', $workspace . '/core/src');
-foreach (['openai' => 'OpenAI', 'openai-compatible' => 'OpenAICompatible', 'xai' => 'XAI', 'concentrate' => 'Concentrate'] as $directory => $namespace) {
+foreach (['openai' => 'OpenAI', 'openai-compatible' => 'OpenAICompatible', 'xai' => 'XAI', 'concentrate' => 'Concentrate', 'transport' => 'Transport'] as $directory => $namespace) {
     $loader->addPsr4('AiSdk\\' . $namespace . '\\', $workspace . '/' . $directory . '/src');
     if (is_dir($workspace . '/' . $directory . '/src/Root')) {
         $loader->addPsr4('AiSdk\\', $workspace . '/' . $directory . '/src/Root');
