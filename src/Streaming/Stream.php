@@ -194,6 +194,7 @@ final class Stream implements IteratorAggregate
             finishReason: $this->state->finishReason(),
             usage: $this->state->usage(),
             providerMetadata: $this->state->providerMetadata(),
+            response: $this->state->response(),
         );
     }
 }

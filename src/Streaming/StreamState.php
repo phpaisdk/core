@@ -30,6 +30,13 @@ final class StreamState
     private ?Usage $usage = null;
     private ?FinishReason $finishReason = null;
 
+    private \AiSdk\Responses\ResponseMetadata $response;
+
+    public function response(): \AiSdk\Responses\ResponseMetadata
+    {
+        return $this->response ?? new \AiSdk\Responses\ResponseMetadata();
+    }
+
     /** @var array<string, mixed> */
     private array $providerMetadata = [];
 
@@ -125,6 +132,7 @@ final class StreamState
 
     private function finish(FinishPart $part): void
     {
+        $this->response = $part->response;
         $this->finishReason = $part->reason;
         $this->usage = $part->usage;
     }

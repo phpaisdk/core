@@ -188,6 +188,7 @@ final class PendingTextRequest
                 usage: $final->usage(),
                 providerMetadata: $final->providerMetadata(),
                 totalUsage: $totalUsage,
+                response: $final->response(),
             );
         });
     }
@@ -248,6 +249,7 @@ final class PendingTextRequest
             rawResponse: $response->rawResponse,
             providerMetadata: $response->providerMetadata,
             totalUsage: $totalUsage,
+            response: $response->response,
         );
     }
 

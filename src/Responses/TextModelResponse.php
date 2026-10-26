@@ -29,6 +29,7 @@ final class TextModelResponse
         public readonly Usage $usage,
         public readonly array $rawResponse = [],
         public readonly array $providerMetadata = [],
+        public readonly ResponseMetadata $response = new ResponseMetadata(),
     ) {}
 
     public function text(): string

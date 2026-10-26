@@ -28,6 +28,7 @@ final class TextResult extends Result
         public readonly array $rawResponse = [],
         array $providerMetadata = [],
         ?Usage $totalUsage = null,
+        public readonly \AiSdk\Responses\ResponseMetadata $response = new \AiSdk\Responses\ResponseMetadata(),
     ) {
         parent::__construct($usage, $providerMetadata);
         $this->totalUsage = $totalUsage ?? $usage;
