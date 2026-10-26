@@ -34,24 +34,24 @@ final class Content
         ]);
     }
 
-    public static function image(string|Stringable $source, ?string $mimeType = null, ?string $filename = null, ?InputEncoding $encoding = null): self
+    public static function image(string|Stringable|LocalFile $source, ?string $mimeType = null, ?string $filename = null, ?InputEncoding $encoding = null): self
     {
-        return new self(self::TYPE_IMAGE, self::resolveSource((string) $source, $mimeType, $filename, $encoding));
+        return new self(self::TYPE_IMAGE, self::resolveSource($source, $mimeType, $filename, $encoding));
     }
 
-    public static function audio(string|Stringable $source, ?string $mimeType = null, ?string $filename = null, ?InputEncoding $encoding = null): self
+    public static function audio(string|Stringable|LocalFile $source, ?string $mimeType = null, ?string $filename = null, ?InputEncoding $encoding = null): self
     {
-        return new self(self::TYPE_AUDIO, self::resolveSource((string) $source, $mimeType, $filename, $encoding));
+        return new self(self::TYPE_AUDIO, self::resolveSource($source, $mimeType, $filename, $encoding));
     }
 
-    public static function video(string|Stringable $source, ?string $mimeType = null, ?string $filename = null, ?InputEncoding $encoding = null): self
+    public static function video(string|Stringable|LocalFile $source, ?string $mimeType = null, ?string $filename = null, ?InputEncoding $encoding = null): self
     {
-        return new self(self::TYPE_VIDEO, self::resolveSource((string) $source, $mimeType, $filename, $encoding));
+        return new self(self::TYPE_VIDEO, self::resolveSource($source, $mimeType, $filename, $encoding));
     }
 
-    public static function file(string|Stringable $source, ?string $mimeType = null, ?string $filename = null, ?InputEncoding $encoding = null): self
+    public static function file(string|Stringable|LocalFile $source, ?string $mimeType = null, ?string $filename = null, ?InputEncoding $encoding = null): self
     {
-        return new self(self::TYPE_FILE, self::resolveSource((string) $source, $mimeType, $filename, $encoding));
+        return new self(self::TYPE_FILE, self::resolveSource($source, $mimeType, $filename, $encoding));
     }
 
     public function textValue(): ?string
@@ -120,8 +120,14 @@ final class Content
     /**
      * @return array<string, mixed>
      */
-    private static function resolveSource(string $source, ?string $mimeType, ?string $filename, ?InputEncoding $encoding): array
+    private static function resolveSource(string|Stringable|LocalFile $source, ?string $mimeType, ?string $filename, ?InputEncoding $encoding): array
     {
+        if ($source instanceof LocalFile) {
+            return self::readLocalFile($source->path, $mimeType, $filename);
+        }
+
+        $source = (string) $source;
+
         if (self::isHttpUrl($source)) {
             return [
                 'source' => ContentSource::Url->value,
@@ -155,20 +161,6 @@ final class Content
             ];
         }
 
-        if (is_file($source) && is_readable($source)) {
-            $data = file_get_contents($source);
-            if ($data === false) {
-                throw new InvalidArgumentException("Unable to read content path [{$source}].");
-            }
-
-            return [
-                'source' => ContentSource::Raw->value,
-                'data' => $data,
-                'mimeType' => $mimeType ?? self::detectMimeType($source),
-                'filename' => $filename ?? basename($source),
-            ];
-        }
-
         if ($mimeType === null) {
             throw new InvalidArgumentException('Raw content requires a MIME type.');
         }
@@ -178,6 +170,29 @@ final class Content
             'data' => $source,
             'mimeType' => $mimeType,
             'filename' => $filename,
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private static function readLocalFile(string $path, ?string $mimeType, ?string $filename): array
+    {
+        if (! is_file($path) || ! is_readable($path)) {
+            throw new InvalidArgumentException("Unable to read content path [{$path}].");
+        }
+
+        $data = file_get_contents($path);
+
+        if ($data === false) {
+            throw new InvalidArgumentException("Unable to read content path [{$path}].");
+        }
+
+        return [
+            'source' => ContentSource::Raw->value,
+            'data' => $data,
+            'mimeType' => $mimeType ?? self::detectMimeType($path),
+            'filename' => $filename ?? basename($path),
         ];
     }
 

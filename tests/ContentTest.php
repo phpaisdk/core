@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 use AiSdk\Content;
 use AiSdk\ContentSource;
+use AiSdk\Exceptions\InvalidArgumentException;
 use AiSdk\InputEncoding;
+use AiSdk\LocalFile;
 
 it('creates explicit text content', function () {
     $content = Content::text('Hello');
@@ -59,7 +61,7 @@ it('resolves a readable local media file as raw input', function () {
     file_put_contents($path, 'local-bytes');
 
     try {
-        $content = Content::audio($path, mimeType: 'audio/wav');
+        $content = Content::audio(LocalFile::at($path), mimeType: 'audio/wav');
 
         expect($content->source())->toBe(ContentSource::Raw)
             ->and($content->data())->toBe('local-bytes')
@@ -114,7 +116,7 @@ it('resolves local video file input', function () {
     file_put_contents($path, 'video-file-bytes');
 
     try {
-        $content = Content::video($path, mimeType: 'video/mp4');
+        $content = Content::video(LocalFile::at($path), mimeType: 'video/mp4');
 
         expect($content->source())->toBe(ContentSource::Raw)
             ->and($content->data())->toBe('video-file-bytes')
@@ -145,3 +147,39 @@ it('requires a mime type for base64 video input', function () {
 it('rejects malformed video data uri input', function () {
     Content::video('data:video/mp4;broken');
 })->throws(\AiSdk\Exceptions\InvalidArgumentException::class, 'Invalid data URI content.');
+
+it('never reads the disk from a plain string', function () {
+    $path = tempnam(sys_get_temp_dir(), 'aisdk-secret-');
+    file_put_contents($path, 'top-secret');
+
+    try {
+        $content = Content::file($path, mimeType: 'text/plain');
+
+        expect($content->data())->toBe($path)->and($content->data())->not->toContain('top-secret');
+        expect(fn() => Content::file($path))->toThrow(InvalidArgumentException::class);
+    } finally {
+        @unlink($path);
+    }
+});
+
+it('confines LocalFile::within() to its base directory', function () {
+    $base = sys_get_temp_dir() . '/aisdk-base-' . bin2hex(random_bytes(4));
+    mkdir($base);
+    file_put_contents($base . '/ok.txt', 'ok');
+    $outside = tempnam(sys_get_temp_dir(), 'aisdk-outside-');
+    file_put_contents($outside, 'outside');
+    symlink($outside, $base . '/link.txt');
+
+    try {
+        expect(Content::file(LocalFile::within($base, 'ok.txt'), mimeType: 'text/plain')->data())->toBe('ok');
+
+        foreach (['../' . basename($outside), $outside, 'link.txt', 'missing.txt', "ok.txt\0"] as $attempt) {
+            expect(fn() => LocalFile::within($base, $attempt))->toThrow(InvalidArgumentException::class);
+        }
+    } finally {
+        @unlink($base . '/link.txt');
+        @unlink($base . '/ok.txt');
+        @rmdir($base);
+        @unlink($outside);
+    }
+});
