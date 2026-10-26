@@ -235,7 +235,7 @@ it('executes registered live tools and sends their result to the provider', func
         ->and($driver->result)->toBe('sunny');
 });
 
-it('leaves unknown live tools for manual handling', function () {
+it('leaves unknown and approval-required live tools for manual handling', function (bool $requiresApproval) {
     $driver = new class implements \AiSdk\Live\Contracts\LiveSessionDriverInterface {
         public bool $sent = false;
         public function sendAudio(string $bytes): void {}
@@ -255,12 +255,13 @@ it('leaves unknown live tools for manual handling', function () {
         public function close(): void {}
     };
 
-    $events = iterator_to_array((new \AiSdk\Live\LiveSession($driver))->events());
+    $tools = $requiresApproval ? [\AiSdk\Tool::make('manual')->needsApproval()->run(fn() => throw new \LogicException('Approval-required live tool was automatically executed.'))] : [];
+    $events = iterator_to_array((new \AiSdk\Live\LiveSession($driver, $tools))->events());
 
     expect($events)->toHaveCount(1)
         ->and($events[0])->toBeInstanceOf(\AiSdk\Live\ToolCallEvent::class)
         ->and($driver->sent)->toBeFalse();
-});
+})->with([false, true]);
 
 it('forwards every session action and preserves provider events unchanged', function () {
     $providerEvent = new \AiSdk\Live\ProviderEvent('fake.future', ['value' => true]);

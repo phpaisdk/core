@@ -52,7 +52,7 @@ final readonly class LiveSession
             }
 
             $tool = $this->tool($event->name);
-            if ($tool === null || $tool->handler() === null) {
+            if ($tool === null || $tool->handler() === null || $tool->requiresApproval()) {
                 continue;
             }
 
