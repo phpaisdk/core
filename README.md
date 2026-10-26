@@ -510,3 +510,68 @@ Transcription tests can use `AiSdk\Testing\Fakes\FakeTranscriptionModel`.
 - [Contributing](https://github.com/phpaisdk/.github/blob/main/CONTRIBUTING.md)
 - [Support](https://github.com/phpaisdk/.github/blob/main/SUPPORT.md)
 - For private security reports, email [security@phpaisdk.com](mailto:security@phpaisdk.com).
+
+## Preparing for 0.10.0
+
+The following APIs are in the upcoming 0.10.0 release. Install matching `^0.10.0` versions of the SDK packages once published.
+
+### Response identity and stream completion
+
+Text results expose `$result->response->id`, `model`, and `rawFinishReason`. Fields are nullable when the provider does not report them. OpenAI-compatible Chat/Responses and Anthropic map them for both synchronous and streamed calls. Other adapters may leave them null.
+
+`Stream::result()` is final-only: it throws before successful completion and rethrows a stored stream or output-validation error. Use `snapshot()` for partial accumulated output, `isComplete()` to check completion, or `run()` to drain the stream. A finalized result is validated once and cached. Replay does not rerun hooks. Each `FinishPart` ends one model step; exhaust the stream to finish a multi-step tool loop. A snapshot is unvalidated and does not imply success.
+
+```php
+$events = [];
+$stream = Generate::text('Hello')->model($model)
+    ->observe(function (\AiSdk\Observability\ModelEvent $event) use (&$events): void {
+        $events[] = $event;
+    })
+    ->stream();
+$result = $stream->run();
+```
+
+Observation emits `start`, then `finish` or `error`, per consumed text-model call. Events contain provider, model, elapsed milliseconds, usage on success, and exception class on failure. They omit prompts, outputs, tool arguments and exception messages. Listener failures are isolated. Abandoned streams do not emit a successful finish. These hooks observe model calls, not tool execution or other modalities.
+
+### Agents and tool approval
+
+`Agent` is a reusable bounded text/tool loop in core. Each run has its own conversation and token accounting. A step limit is shared across approval pauses and resumes.
+
+```php
+$send = Tool::make('send_notification')
+    ->needsApproval()
+    ->run(fn (): string => $notifications->send());
+
+$agent = new \AiSdk\Agent(
+    model: $model,
+    instructions: 'Help the user with notifications.',
+    tools: [$send],
+    maxSteps: 5,
+    store: $checkpointStore, // implements AiSdk\Agents\CheckpointStore
+    signingKey: $applicationSigningKey, // at least 32 random bytes, kept server-side
+    id: 'notifications-v1',
+);
+$run = $agent->run('Send a notification', scope: $authenticatedTenantAndUser);
+// Display $run->approvals. Authorize the current user before accepting decisions.
+$done = $agent->resume($run->resumeToken, ['provider-call-id' => true], scope: $authenticatedTenantAndUser);
+```
+
+When approval is needed, the entire tool batch pauses before any tool executes. Decisions are keyed by tool-call id; `false` sends a denial result to the model. Missing decisions fail closed. `Generate` tool loops reject approval-required tools; use `Agent` for pause/resume.
+
+Implement `CheckpointStore::put()` and **atomic** `consume()` in application-owned storage. Store the complete `AgentCheckpoint` server-side, including its messages and usage. Resume tokens contain a random lookup id and an HMAC bound to scope and agent id; conversation contents never travel in the token. Protect stored conversations as application data. Checkpoints expire after 15 minutes by default. A valid submission consumes the checkpoint before execution, including submissions with invalid decisions. This prevents replay but does not guarantee exactly-once external effects after a process crash; use idempotent tools and application transaction boundaries. Change the agent id when its tool policy changes. Keep tool definitions stable while checkpoints are outstanding.
+
+Agent execution is synchronous in this release. `AgentResult::stepLimitReached` distinguishes a bounded stop from a model's final answer; `result` can be null when a resumed run has no model steps remaining. `messages` includes tool results and can be passed into a later run. Do not treat a new run as a way to reset the budget for an untrusted task automatically.
+
+### Migration and compatibility policy
+
+- Local input files must use `LocalFile::at()` or `LocalFile::within()`; plain strings are never opened as files.
+- Replace reads of partial `Stream::result()` with `snapshot()`. Final `result()` calls after full iteration continue to work.
+- Tool errors return to the model by default; use `throwOnToolError()` to abort. Handler exception messages remain hidden unless explicitly enabled.
+- Use `Provider::model('opaque-id')`; capability-specific public factories are not supported.
+- Generation defaults are provider-owned; unset token and sampling options remain null.
+- Upgrade SDK packages together for feature-minor releases. The 0.x line can change public contracts between feature minors; patch releases preserve those contracts.
+- For 1.0, public factories, builders, DTO fields, stream parts, model interfaces and documented subclass extension points are the compatibility surface. Classes marked `@internal` are excluded. A public API freeze still requires provider conformance and fresh-install validation; passing local unit tests alone does not establish v1 readiness.
+
+### Coordinated release preparation
+
+From the sibling-package workspace, run `python3 core/scripts/release.py 0.10.0` to inspect the dependency-ordered plan. Add `--write` to update SDK Composer constraints. The script excludes Laravel, Symfony and the local aggregate package, includes unchanged publishable packages, rejects prerelease versions and missing/cyclic dependencies, and never commits, pushes, tags or publishes. Release each package at the planned stable version only after its checks and fresh Composer resolution pass. Publish core and shared adapters before dependent providers, waiting for their versions to become available to Composer.
