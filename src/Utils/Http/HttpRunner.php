@@ -8,6 +8,7 @@ use AiSdk\Exceptions\APIConnectionException;
 use AiSdk\Support\Json;
 use AiSdk\Support\Sdk;
 use AiSdk\Utils\Errors\HttpErrorNormalizer;
+use AiSdk\Utils\Errors\Redactor;
 use AiSdk\Utils\Stream\SseParser;
 use Generator;
 use GuzzleHttp\ClientInterface as GuzzleClientInterface;
@@ -145,8 +146,8 @@ final class HttpRunner
             return $this->client->sendRequest($request);
         } catch (ClientExceptionInterface $e) {
             throw new APIConnectionException(
-                message: 'HTTP transport error: ' . $e->getMessage(),
-                context: ['url' => (string) $request->getUri()],
+                message: 'HTTP transport error: ' . Redactor::text($e->getMessage()),
+                context: ['url' => Redactor::url((string) $request->getUri())],
                 previous: $e,
             );
         }
