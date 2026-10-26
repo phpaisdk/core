@@ -575,3 +575,15 @@ Agent execution is synchronous in this release. `AgentResult::stepLimitReached` 
 ### Coordinated release preparation
 
 From the sibling-package workspace, run `python3 core/scripts/release.py 0.10.0` to inspect the dependency-ordered plan. Add `--write` to update SDK Composer constraints. The script excludes Laravel, Symfony and the local aggregate package, includes unchanged publishable packages, rejects prerelease versions and missing/cyclic dependencies, and never commits, pushes, tags or publishes. Release each package at the planned stable version only after its checks and fresh Composer resolution pass. Publish core and shared adapters before dependent providers, waiting for their versions to become available to Composer.
+
+### Opt-in live conformance tests
+
+`tests/LiveProviderConformanceTest.php` checks text, streaming, tool loops and structured output across native, OpenAI and shared compatible adapters against xAI and Concentrate. The suite is skipped unless `AISDK_LIVE_CONFORMANCE=1` is set. It uses `grok-build-0.1` and `ministral-3-3b`, short prompts, 24–96 output-token limits and at most two tool steps per test. Running it consumes credits; model availability and pricing remain provider-owned.
+
+From `core/`, supply `XAI_API_KEY` and `CONCENTRATE_API_KEY` through the environment and run:
+
+```bash
+AISDK_LIVE_CONFORMANCE=1 vendor/bin/pest tests/LiveProviderConformanceTest.php --bootstrap scripts/live-bootstrap.php
+```
+
+The bootstrap expects the sibling provider source checkouts used by this workspace. To read an existing application's `.env`, set `AISDK_LIVE_AUTOLOAD` to its `vendor/autoload.php` and `AISDK_LIVE_ENV_DIR` to its directory. The application must already provide `vlucas/phpdotenv`; this adds no dependency or path repository to the application. Use a credential store or existing environment configuration, and never pass key values as command arguments. Passing against a compatible endpoint verifies the adapter's live wire behavior; it does not establish coverage of every OpenAI service or model-specific feature.
