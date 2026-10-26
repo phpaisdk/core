@@ -15,6 +15,20 @@ use AiSdk\Support\SchemaValidator;
  */
 class Tool
 {
+    private bool $approvalRequired = false;
+
+    public function needsApproval(bool $required = true): self
+    {
+        $this->approvalRequired = $required;
+
+        return $this;
+    }
+
+    public function requiresApproval(): bool
+    {
+        return $this->approvalRequired;
+    }
+
     private string $name = '';
     private string $description = '';
 

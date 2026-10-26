@@ -33,6 +33,7 @@ final readonly class ToolExecutor
         private array $tools,
         private bool $throwOnError = false,
         private bool $exposeErrors = false,
+        private bool $approved = false,
     ) {}
 
     /**
@@ -50,6 +51,10 @@ final readonly class ToolExecutor
             $available = implode(', ', array_map(static fn(Tool $tool): string => $tool->name(), $this->tools));
 
             return new ToolResult($call->id, $call->name, ['error' => "Unknown tool [{$call->name}]. Available tools: {$available}."], isError: true);
+        }
+
+        if ($tool->requiresApproval() && ! $this->approved) {
+            throw new \LogicException('This tool requires approval. Use Agent to pause and resume with an explicit decision.');
         }
 
         $context = new ToolExecutionContext(
