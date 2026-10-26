@@ -519,7 +519,7 @@ The following APIs are in the upcoming 0.10.0 release. Install matching `^0.10.0
 
 Text results expose `$result->response->id`, `model`, and `rawFinishReason`. Fields are nullable when the provider does not report them. OpenAI-compatible Chat/Responses and Anthropic map them for both synchronous and streamed calls. Other adapters may leave them null.
 
-`Stream::result()` is final-only: it throws before successful completion and rethrows a stored stream or output-validation error. Use `snapshot()` for partial accumulated output, `isComplete()` to check completion, or `run()` to drain the stream. A finalized result is validated once and cached. Replay does not rerun hooks. Each `FinishPart` ends one model step; exhaust the stream to finish a multi-step tool loop. A snapshot is unvalidated and does not imply success.
+`Stream::result()` is final-only: it throws before successful completion and rethrows a stored stream or output-validation error. Use `snapshot()` for partial accumulated output, `isComplete()` to check completion, or `run()` to drain the stream. A finalized result is validated once and cached. Replay does not rerun hooks. Each `FinishPart` ends one model step; exhaust the stream to finish a multi-step tool loop. A snapshot is unvalidated and does not imply success; tool calls with incomplete JSON arguments are omitted until decodable. Only one active stream consumer is allowed.
 
 ```php
 $events = [];

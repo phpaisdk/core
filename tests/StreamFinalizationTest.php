@@ -51,3 +51,29 @@ it('retains finalization errors without reporting successful completion', functi
         ->and(fn() => $stream->run())->toThrow($error)
         ->and($stream->isComplete())->toBeFalse()->and($errors)->toBe(1);
 });
+
+it('rejects overlapping consumers without poisoning a resumable stream', function () {
+    $stream = new Stream((function () {
+        yield new TextDeltaPart('a');
+        yield new TextDeltaPart('b');
+    })());
+    $iterator = $stream->getIterator();
+    $iterator->current();
+    expect(fn() => $stream->run())->toThrow(LogicException::class);
+    unset($iterator);
+    expect($stream->run()->text)->toBe('ab');
+});
+
+it('allows snapshots during incomplete tool arguments but rejects malformed final arguments', function () {
+    $stream = new Stream((function () {
+        yield new \AiSdk\Streaming\ToolCallStartPart(0, 'call', 'tool');
+        yield new \AiSdk\Streaming\ToolCallDeltaPart(0, '{"value":');
+    })());
+    foreach ($stream as $part) {
+        if ($part instanceof \AiSdk\Streaming\ToolCallDeltaPart) {
+            expect($stream->snapshot()->toolCalls)->toBe([]);
+            break;
+        }
+    }
+    expect(fn() => $stream->run())->toThrow(\AiSdk\Exceptions\JsonException::class);
+});

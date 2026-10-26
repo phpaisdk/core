@@ -37,6 +37,8 @@ final class Stream implements IteratorAggregate
 
     private bool $complete = false;
 
+    private bool $consuming = false;
+
     private ?TextResult $finalResult = null;
 
     private ?Throwable $failure = null;
@@ -103,6 +105,11 @@ final class Stream implements IteratorAggregate
             return;
         }
 
+        if ($this->consuming) {
+            throw new \LogicException('A stream may have only one active consumer.');
+        }
+        $this->consuming = true;
+
         try {
             while (true) {
                 if ($this->advanceSource) {
@@ -133,7 +140,7 @@ final class Stream implements IteratorAggregate
 
             $this->finalResult = is_callable($this->resultFactory)
                 ? ($this->resultFactory)($this->state)
-                : $this->snapshot();
+                : $this->accumulatedResult(false);
             $this->complete = true;
 
             if ($this->onToolCall !== null) {
@@ -153,6 +160,8 @@ final class Stream implements IteratorAggregate
             }
 
             throw $e;
+        } finally {
+            $this->consuming = false;
         }
     }
 
@@ -206,11 +215,16 @@ final class Stream implements IteratorAggregate
     /** Partial accumulated output, without structured-output validation. */
     public function snapshot(): TextResult
     {
+        return $this->accumulatedResult(true);
+    }
+
+    private function accumulatedResult(bool $partial): TextResult
+    {
         return new TextResult(
             text: $this->state->text(),
             reasoning: $this->state->reasoning(),
             output: null,
-            toolCalls: $this->state->toolCalls(),
+            toolCalls: $this->state->toolCalls(partial: $partial),
             finishReason: $this->state->finishReason(),
             usage: $this->state->usage(),
             providerMetadata: $this->state->providerMetadata(),

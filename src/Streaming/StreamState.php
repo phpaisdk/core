@@ -84,11 +84,19 @@ final class StreamState
     /**
      * @return array<int, ToolCall>
      */
-    public function toolCalls(): array
+    public function toolCalls(bool $partial = false): array
     {
         $calls = [];
         foreach ($this->toolCalls as $slot) {
-            $args = $slot['args'] === '' ? [] : Json::decodeValue($slot['args']);
+            try {
+                $args = $slot['args'] === '' ? [] : Json::decodeValue($slot['args']);
+            } catch (\AiSdk\Exceptions\JsonException $error) {
+                if ($partial) {
+                    continue;
+                }
+
+                throw $error;
+            }
             $calls[] = new ToolCall($slot['id'], $slot['name'], is_array($args) ? $args : []);
         }
 
