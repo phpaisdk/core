@@ -53,6 +53,12 @@ final class Generate
         }
     }
 
+    /** @param string|array<string|int, mixed> $input */
+    public static function decision(string|array $input): \AiSdk\Support\PendingDecisionRequest
+    {
+        return new \AiSdk\Support\PendingDecisionRequest($input, self::defaultTextModel());
+    }
+
     public static function text(?string $prompt = null): PendingTextRequest
     {
         $request = new PendingTextRequest(self::defaultTextModel(), self::sdk()->container);

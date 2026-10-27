@@ -29,6 +29,7 @@ abstract class BaseProvider implements ProviderInterface
     final protected function resolveModel(string $modelId, string $contract): Model
     {
         return match ($contract) {
+            DecisionModelInterface::class => $this->decisionModel($modelId),
             TextModelInterface::class => $this->textModel($modelId),
             ImageModelInterface::class => $this->imageModel($modelId),
             SpeechModelInterface::class => $this->speechModel($modelId),
@@ -38,6 +39,11 @@ abstract class BaseProvider implements ProviderInterface
             LiveModelInterface::class => $this->liveModel($modelId),
             default => throw NoSuchModelException::for($this->name(), $modelId, $contract),
         };
+    }
+
+    protected function decisionModel(string $modelId): DecisionModelInterface
+    {
+        throw NoSuchModelException::for($this->name(), $modelId, 'decisionModel');
     }
 
     protected function textModel(string $modelId): TextModelInterface
