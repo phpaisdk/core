@@ -26,6 +26,18 @@ final class Content
         public readonly array $payload,
     ) {}
 
+    public static function storedFile(\AiSdk\Files\FileReference $file, bool $image = false): self
+    {
+        return new self($image ? self::TYPE_IMAGE : self::TYPE_FILE, ['source' => ContentSource::StoredFile->value, 'file' => $file]);
+    }
+
+    public function fileReference(): ?\AiSdk\Files\FileReference
+    {
+        $file = $this->payload['file'] ?? null;
+
+        return $file instanceof \AiSdk\Files\FileReference ? $file : null;
+    }
+
     public static function text(string $text): self
     {
         return new self(self::TYPE_TEXT, [

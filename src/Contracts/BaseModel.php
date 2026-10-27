@@ -63,6 +63,12 @@ abstract class BaseModel implements Model
 
         foreach ($request->messages as $message) {
             foreach ($message->content as $content) {
+                if (($file = $content->fileReference()) !== null) {
+                    $file->forProvider($this->provider());
+                    if (! $this->supportsStoredFiles()) {
+                        throw new \AiSdk\Exceptions\InvalidArgumentException('This model adapter does not support stored-file references.');
+                    }
+                }
                 $capability = match ($content->type) {
                     \AiSdk\Content::TYPE_IMAGE => Capability::ImageInput,
                     \AiSdk\Content::TYPE_AUDIO => Capability::AudioInput,
@@ -80,6 +86,11 @@ abstract class BaseModel implements Model
         foreach (array_unique($required, SORT_REGULAR) as $capability) {
             $this->ensureAdapterCapability($capability, $adapterCapabilities, $adaptedCapabilities);
         }
+    }
+
+    protected function supportsStoredFiles(): bool
+    {
+        return false;
     }
 
     /**
