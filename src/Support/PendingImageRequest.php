@@ -13,6 +13,8 @@ use AiSdk\Results\ImageResult;
 
 final class PendingImageRequest
 {
+    use \AiSdk\Support\Concerns\ObservesModelOperations;
+
     private ?string $prompt = null;
     private int $count = 1;
     private ?string $size = null;
@@ -97,7 +99,7 @@ final class PendingImageRequest
 
         $model = ModelResolver::resolve($this->model, ImageModelInterface::class, 'Generate::image()');
 
-        $response = $model->generate($request);
+        $response = $this->observeOperation($model, 'image', fn() => $model->generate($request));
 
         $output = $response->first();
         if ($output === null) {

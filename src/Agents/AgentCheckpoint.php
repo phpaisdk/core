@@ -24,5 +24,7 @@ final readonly class AgentCheckpoint
         public array $approvalIds,
         public int $remainingSteps,
         public Usage $usage,
+        public ?\AiSdk\Observability\RunContext $runContext = null,
+        public int $completedSteps = 0,
     ) {}
 }

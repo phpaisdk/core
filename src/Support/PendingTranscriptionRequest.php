@@ -13,6 +13,8 @@ use AiSdk\Results\TranscriptResult;
 
 final class PendingTranscriptionRequest
 {
+    use \AiSdk\Support\Concerns\ObservesModelOperations;
+
     private ?Content $audio = null;
 
     /** @var array<string, array<string, mixed>> */
@@ -58,10 +60,10 @@ final class PendingTranscriptionRequest
         }
 
         $model = ModelResolver::resolve($this->model, TranscriptionModelInterface::class, 'Generate::transcription()');
-        $response = $model->transcribe(new TranscriptionRequest(
+        $response = $this->observeOperation($model, 'transcription', fn() => $model->transcribe(new TranscriptionRequest(
             audio: $this->audio,
             providerOptions: $this->providerOptions,
-        ));
+        )));
 
         return new TranscriptResult(
             output: $response->transcript,

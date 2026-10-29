@@ -17,5 +17,7 @@ final readonly class ModelEvent
         public float $durationMs = 0,
         public ?Usage $usage = null,
         public ?string $errorType = null,
+        public string $operation = 'text',
+        public ?RunContext $runContext = null,
     ) {}
 }

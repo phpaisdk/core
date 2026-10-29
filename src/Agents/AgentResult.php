@@ -21,5 +21,6 @@ final readonly class AgentResult
         public array $approvals = [],
         public ?string $resumeToken = null,
         public bool $stepLimitReached = false,
+        public ?\AiSdk\Observability\RunContext $runContext = null,
     ) {}
 }

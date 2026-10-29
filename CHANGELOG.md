@@ -11,6 +11,11 @@ Notable changes to `aisdk/core`. Release notes are also published at https://git
 - Stored file ids that could change the request route (`/`, `\`, `?`, `#`, `%`, whitespace) are rejected before any request.
 - Provider errors wrapped in a one-element list (Google) are read correctly, so a bad API key is an `AuthenticationException`.
 
+## Unreleased (v0.11.0)
+
+- Observe agent and text tool-loop runs with a shared invocation id, step and tool events, timings, safe failures, and approval-resume continuity. Register isolated listeners with `onEvent()` and test with `RecordingEvents`.
+- Observe successes and failures for image, speech, transcription, embedding, decision, and video model operations with `observe()`.
+
 ## v0.10.1 — 2026-10-29
 
 - Error messages from providers are redacted for echoed credentials and capped in length; odd error bodies no longer raise PHP warnings.

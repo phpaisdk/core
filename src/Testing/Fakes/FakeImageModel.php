@@ -12,6 +12,8 @@ use AiSdk\Results\ImageData;
 
 final class FakeImageModel extends BaseModel implements ImageModelInterface
 {
+    use FailsModelOperations;
+
     public ?ImageRequest $lastRequest = null;
 
     public function __construct(private readonly ImageResponse $response) {}
@@ -28,6 +30,7 @@ final class FakeImageModel extends BaseModel implements ImageModelInterface
 
     public function generate(ImageRequest $request): ImageResponse
     {
+        $this->failIfRequested();
         $this->lastRequest = $request;
 
         return $this->response;

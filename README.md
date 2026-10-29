@@ -654,3 +654,22 @@ For one boolean: `Generate::decision($text)->model($model)->decide('Is this spam
 OpenAI supports `images(Content::image(...))`, structured JSON evidence, and text/image arrays in question instructions. Stored file ids are not supported by Decisions. The TypeSafe adapter currently supports text/JSON evidence and text instructions; TypeSafe image assets and conversational input mapping remain follow-up work. Question choices currently use nonempty string values. A result contains `answers`, `usage`, and `rawResponse`; each answer has a `kind`, typed `value`, optional `confidence`, and native `probabilities`. Refusal is explicit (`kind === 'refusal'`); calling `yes()` on a refusal throws instead of treating it as false. Thresholds must be chosen using application evaluation data, not interpreted as guarantees.
 
 Missing/duplicate answers, unknown options, invalid probabilities, incomplete distributions, and scores outside the supplied rubric fail locally. `Testing\Fakes\FakeDecisionModel` accepts a `DecisionModelResponse` for deterministic application tests. There are no live API calls in these tests.
+
+## Run events (0.11)
+
+Register an `AiSdk\Observability\Events` listener (`handle(RunEvent $event): void`) or a callable with `onEvent()` on an agent or text request. Agent registration returns a new agent. Text-request registration follows its mutable builder conventions.
+
+```php
+$events = new AiSdk\Testing\Fakes\RecordingEvents;
+$agent = (new AiSdk\Agent($model, tools: [$tool]))->onEvent($events);
+$run = $agent->run('Look up the order');
+echo $run->runContext->invocationId;
+```
+
+Each run has an immutable `RunContext` snapshot with `invocationId`, optional `parentInvocationId`, `startedAt` and `finishedAt`. `RunStarted`, `StepStarted`, `StepFinished`, `ToolStarted`, `ToolFinished`, `ToolFailed`, `RunFinished`, `RunFailed` and `RunPaused` live in `AiSdk\Observability\Events`. Step indexes start at one; tool durations use monotonic microseconds. Step events include usage, finish reason and tool call ids/names with arguments omitted. Events carry no prompts, generated content, tool arguments, tool outputs or arbitrary exception messages. Failure events report exception classes; `RunFailed::message` is the fixed sanitized text `Run failed.` Listener failures are swallowed independently.
+
+Approval pauses emit `RunPaused`, leave `finishedAt` unset, and preserve the context and step index in the checkpoint. Resume ends the same invocation; it does not emit a second `RunStarted`. Custom stores must persist the optional `AgentCheckpoint::runContext` and `completedSteps` fields to preserve continuity. Older checkpoints without these fields still resume, with a new context. An unconsumed stream does not start a run; abandoning a partially consumed stream does not imply completion.
+
+Tool handlers receive the context through `ToolExecutionContext::runContext`. To explicitly link other application-managed child work, use `Agent::runWithContext($prompt, $parentContext, $scope)` or `PendingTextRequest::withRunContext($parentContext)`. Both create a new invocation linked to that parent, without process-global state.
+
+All generation builders also support `observe(callable(ModelEvent): void)`. This observes provider-operation start, finish and error, includes an `operation` label, and preserves exception propagation. Video emits separate `video.generate` and `video.poll` operations. Direct calls to provider model adapters bypass builder observation. Script failures offline with any `Testing\Fakes\Fake*Model::failWith($sdkException)`.

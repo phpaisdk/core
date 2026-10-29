@@ -13,6 +13,8 @@ use AiSdk\Results\EmbeddingResult;
 
 final class PendingEmbeddingRequest
 {
+    use \AiSdk\Support\Concerns\ObservesModelOperations;
+
     /** @var array<int, string>|null */
     private ?array $inputs = null;
 
@@ -83,11 +85,11 @@ final class PendingEmbeddingRequest
         }
 
         $model = ModelResolver::resolve($this->model, EmbeddingModelInterface::class, 'Generate::embedding()');
-        $response = $model->generate(new EmbeddingRequest(
+        $response = $this->observeOperation($model, 'embedding', fn() => $model->generate(new EmbeddingRequest(
             inputs: $this->inputs,
             dimensions: $this->dimensions,
             providerOptions: $this->providerOptions,
-        ));
+        )));
 
         $output = $response->first();
         if ($output === null) {

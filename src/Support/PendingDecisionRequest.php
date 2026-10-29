@@ -16,6 +16,8 @@ use AiSdk\Support\Concerns\HasProviderOptions;
 
 final class PendingDecisionRequest
 {
+    use \AiSdk\Support\Concerns\ObservesModelOperations;
+
     use HasProviderOptions;
 
     /** @var list<Question> */
@@ -65,7 +67,7 @@ final class PendingDecisionRequest
             throw new InvalidArgumentException('At least one decision question is required.');
         }
         $model = ModelResolver::resolve($this->model, DecisionModelInterface::class, 'Generate::decision()');
-        $response = $model->decide(new DecisionModelRequest($this->input, $this->questions, $this->images, $this->readProviderOptions()[$model->provider()] ?? []));
+        $response = $this->observeOperation($model, 'decision', fn() => $model->decide(new DecisionModelRequest($this->input, $this->questions, $this->images, $this->readProviderOptions()[$model->provider()] ?? [])));
         if (count($response->answers) !== count($this->questions)) {
             throw new InvalidResponseException('Decision response must contain one answer per question.');
         }

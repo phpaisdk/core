@@ -12,6 +12,8 @@ use AiSdk\Results\AudioResult;
 
 final class PendingSpeechRequest
 {
+    use \AiSdk\Support\Concerns\ObservesModelOperations;
+
     private ?string $input = null;
     private ?string $voice = null;
     private ?string $format = null;
@@ -73,7 +75,7 @@ final class PendingSpeechRequest
 
         $model = ModelResolver::resolve($this->model, SpeechModelInterface::class, 'Generate::speech()');
 
-        $response = $model->generate($request);
+        $response = $this->observeOperation($model, 'speech', fn() => $model->generate($request));
 
         return new AudioResult(
             output: $response->audio,

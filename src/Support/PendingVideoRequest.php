@@ -18,6 +18,8 @@ use AiSdk\Results\VideoResult;
 
 final class PendingVideoRequest
 {
+    use \AiSdk\Support\Concerns\ObservesModelOperations;
+
     private ?string $prompt = null;
 
     private ?Content $image = null;
@@ -161,7 +163,7 @@ final class PendingVideoRequest
             throw new InvalidArgumentException('Video wait timeout must be positive and poll interval cannot be negative.');
         }
         $model = $this->resolvedModel();
-        $job = $model->generate($this->request());
+        $job = $this->observeOperation($model, 'video.generate', fn() => $model->generate($this->request()));
         $started = hrtime(true);
         while (! in_array($job->status, [VideoJobStatus::Succeeded, VideoJobStatus::Failed, VideoJobStatus::Canceled, VideoJobStatus::Expired], true)) {
             if ((hrtime(true) - $started) / 1_000_000_000 >= $timeout) {
@@ -170,7 +172,7 @@ final class PendingVideoRequest
             if ($pollIntervalMs > 0) {
                 usleep($pollIntervalMs * 1000);
             }
-            $job = $model->poll($job);
+            $job = $this->observeOperation($model, 'video.poll', fn() => $model->poll($job));
         }
         if ($job->status !== VideoJobStatus::Succeeded || $job->result === null) {
             throw new VideoException($job->errorMessage ?? "Video job [{$job->id}] ended with status [{$job->status->value}].", ['jobId' => $job->id, 'provider' => $job->provider, 'modelId' => $job->modelId, 'status' => $job->status->value, 'metadata' => $job->providerMetadata]);
@@ -181,7 +183,9 @@ final class PendingVideoRequest
 
     public function job(): VideoJob
     {
-        return $this->resolvedModel()->generate($this->request());
+        $model = $this->resolvedModel();
+
+        return $this->observeOperation($model, 'video.generate', fn() => $model->generate($this->request()));
     }
 
     public function async(): VideoJob

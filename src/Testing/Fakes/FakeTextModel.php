@@ -18,6 +18,8 @@ use Generator;
 
 final class FakeTextModel extends BaseModel implements TextModelInterface
 {
+    use FailsModelOperations;
+
     public ?TextModelRequest $lastRequest = null;
 
     /** @var array<int, TextModelRequest> */
@@ -52,6 +54,7 @@ final class FakeTextModel extends BaseModel implements TextModelInterface
 
     public function generate(TextModelRequest $request): TextModelResponse
     {
+        $this->failIfRequested();
         $this->lastRequest = $request;
         $this->requests[] = $request;
 
@@ -60,6 +63,7 @@ final class FakeTextModel extends BaseModel implements TextModelInterface
 
     public function stream(TextModelRequest $request): Generator
     {
+        $this->failIfRequested();
         $this->lastRequest = $request;
         $this->requests[] = $request;
         $sequence = $this->streamSequences[min(count($this->requests) - 1, count($this->streamSequences) - 1)];

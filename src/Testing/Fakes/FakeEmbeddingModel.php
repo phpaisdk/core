@@ -12,6 +12,8 @@ use AiSdk\Results\EmbeddingData;
 
 final class FakeEmbeddingModel extends BaseModel implements EmbeddingModelInterface
 {
+    use FailsModelOperations;
+
     public ?EmbeddingRequest $lastRequest = null;
 
     public function __construct(private readonly EmbeddingResponse $response) {}
@@ -28,6 +30,7 @@ final class FakeEmbeddingModel extends BaseModel implements EmbeddingModelInterf
 
     public function generate(EmbeddingRequest $request): EmbeddingResponse
     {
+        $this->failIfRequested();
         $this->lastRequest = $request;
 
         return $this->response;

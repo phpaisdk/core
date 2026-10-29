@@ -19,7 +19,7 @@ use Throwable;
 final readonly class ObservedTextModel implements TextModelInterface
 {
     /** @param Closure(ModelEvent): void $observer */
-    public function __construct(private TextModelInterface $model, private Closure $observer) {}
+    public function __construct(private TextModelInterface $model, private Closure $observer, private ?RunContext $run = null) {}
 
     public function specificationVersion(): string
     {
@@ -66,6 +66,9 @@ final readonly class ObservedTextModel implements TextModelInterface
                 $state->record($part);
                 yield $part;
             }
+            if ($state->partCount() === 0) {
+                throw new \AiSdk\Exceptions\InvalidResponseException('The model stream ended without sending any content.');
+            }
             $this->emit('finish', true, $start, $state->usage());
         } catch (Throwable $error) {
             $this->emit('error', true, $start, error: $error);
@@ -77,10 +80,6 @@ final readonly class ObservedTextModel implements TextModelInterface
 
     private function emit(string $phase, bool $streaming, int $start, ?Usage $usage = null, ?Throwable $error = null): void
     {
-        try {
-            ($this->observer)(new ModelEvent($phase, $this->provider(), $this->modelId(), $streaming, (hrtime(true) - $start) / 1_000_000, $usage, $error === null ? null : $error::class));
-        } catch (Throwable) {
-            // Diagnostic failures must never retry or invalidate a successful provider call.
-        }
+        (new ModelObservation($this->observer, $this->run))->emit($this->model, $phase, 'text', $streaming, $start, $usage, $error);
     }
 }

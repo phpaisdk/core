@@ -50,9 +50,36 @@ final class PendingTextRequest
         return $this;
     }
 
-    private function observed(TextModelInterface $model): TextModelInterface
+    /** @var list<\AiSdk\Observability\Events|\Closure> */
+    private array $eventListeners = [];
+
+    /** @param \AiSdk\Observability\Events|callable(\AiSdk\Observability\RunEvent): void $listener */
+    public function onEvent(\AiSdk\Observability\Events|callable $listener): self
     {
-        return $this->observer === null ? $model : new \AiSdk\Observability\ObservedTextModel($model, $this->observer);
+        $this->eventListeners[] = $listener instanceof \AiSdk\Observability\Events ? $listener : \Closure::fromCallable($listener);
+
+        return $this;
+    }
+
+    private ?\AiSdk\Observability\RunContext $parentRunContext = null;
+
+    public function withRunContext(\AiSdk\Observability\RunContext $parent): self
+    {
+        $this->parentRunContext = $parent;
+
+        return $this;
+    }
+
+    private function observed(TextModelInterface $model, \AiSdk\Observability\RunTrace $trace): TextModelInterface
+    {
+        $observer = $this->observer;
+
+        return new \AiSdk\Observability\ObservedTextModel($model, static function (\AiSdk\Observability\ModelEvent $event) use ($trace, $observer): void {
+            $trace->modelEvent($event);
+            if ($observer !== null) {
+                $observer($event);
+            }
+        }, $trace->context);
     }
 
     private ?Output $output = null;
@@ -97,10 +124,24 @@ final class PendingTextRequest
 
     public function run(): TextResult
     {
+        $trace = new \AiSdk\Observability\RunTrace(\AiSdk\Observability\RunContext::start($this->parentRunContext), $this->eventListeners);
+        $trace->start();
+
+        try {
+            return $this->runObserved($trace);
+        } catch (\Throwable $error) {
+            $trace->fail($error);
+
+            throw $error;
+        }
+    }
+
+    private function runObserved(\AiSdk\Observability\RunTrace $trace): TextResult
+    {
         $request = $this->request();
         $model = ModelResolver::resolve($this->model, TextModelInterface::class, 'Generate::text()');
-        $model = $this->observed($model);
-        $executor = $this->executor($request->tools);
+        $model = $this->observed($model, $trace);
+        $executor = $this->executor($request->tools, $trace);
 
         $messages = $request->messages;
         $toolCalls = [];
@@ -109,9 +150,11 @@ final class PendingTextRequest
         $response = null;
 
         for ($step = 1; $step <= $request->maxSteps; $step++) {
+            $trace->stepStarted($step);
             $response = $model->generate($request->withMessages($messages));
             $totalUsage = $totalUsage->add($response->usage);
             $calls = $response->toolCalls();
+            $trace->stepFinished($step, $response->usage, $response->finishReason, $calls);
             $results = [];
 
             if ($calls !== []) {
@@ -130,7 +173,7 @@ final class PendingTextRequest
             $stop = $this->stepFinished(new StepResult($step, $response->text(), $calls, $results, $response->finishReason, $response->usage));
 
             if ($calls === [] || $stop) {
-                return $this->resultFromResponse($response, $toolCalls, $toolResults, $totalUsage);
+                return $this->resultFromResponse($response, $toolCalls, $toolResults, $totalUsage, $trace);
             }
         }
 
@@ -138,86 +181,104 @@ final class PendingTextRequest
             throw new InvalidArgumentException('Generate::text() requires at least one step.');
         }
 
-        return $this->resultFromResponse($response, $toolCalls, $toolResults, $totalUsage);
+        return $this->resultFromResponse($response, $toolCalls, $toolResults, $totalUsage, $trace);
     }
 
     public function stream(): Stream
     {
+        $trace = new \AiSdk\Observability\RunTrace(\AiSdk\Observability\RunContext::start($this->parentRunContext), $this->eventListeners);
         $request = $this->request();
         $model = ModelResolver::resolve(
             $this->model,
             TextModelInterface::class,
             'Generate::text()->stream()',
         );
-        $model = $this->observed($model);
-        $executor = $this->executor($request->tools);
+        $model = $this->observed($model, $trace);
+        $executor = $this->executor($request->tools, $trace);
 
         $toolCalls = [];
         $toolResults = [];
         $totalUsage = Usage::empty();
         $finalState = null;
 
-        $parts = (function () use ($model, $request, $executor, &$toolCalls, &$toolResults, &$totalUsage, &$finalState): \Generator {
-            $messages = $request->messages;
+        $parts = (function () use ($model, $request, $executor, $trace, &$toolCalls, &$toolResults, &$totalUsage, &$finalState): \Generator {
+            $trace->start();
 
-            for ($step = 1; $step <= $request->maxSteps; $step++) {
-                $state = new StreamState();
+            try {
+                $messages = $request->messages;
 
-                foreach ($model->stream($request->withMessages($messages)) as $part) {
-                    $state->record($part);
-                    yield $part;
-                }
+                for ($step = 1; $step <= $request->maxSteps; $step++) {
+                    $trace->stepStarted($step);
+                    $state = new StreamState();
 
-                $finalState = $state;
-                $totalUsage = $totalUsage->add($state->usage());
-                $calls = $state->toolCalls();
-                $results = [];
-
-                if ($calls !== []) {
-                    array_push($toolCalls, ...$calls);
-                    $messages[] = Message::assistant($state->text(), toolCalls: $calls);
-
-                    foreach ($calls as $call) {
-                        $result = $executor->execute($call, $messages);
-                        $results[] = $result;
-                        $messages[] = $this->toolMessage($result);
+                    foreach ($model->stream($request->withMessages($messages)) as $part) {
+                        $state->record($part);
+                        yield $part;
                     }
 
-                    array_push($toolResults, ...$results);
-                }
+                    $finalState = $state;
+                    $totalUsage = $totalUsage->add($state->usage());
+                    $calls = $state->toolCalls();
+                    $trace->stepFinished($step, $state->usage(), $state->finishReason(), $calls);
+                    $results = [];
 
-                $stop = $this->stepFinished(new StepResult($step, $state->text(), $calls, $results, $state->finishReason(), $state->usage()));
+                    if ($calls !== []) {
+                        array_push($toolCalls, ...$calls);
+                        $messages[] = Message::assistant($state->text(), toolCalls: $calls);
 
-                if ($calls === [] || $stop) {
-                    return;
+                        foreach ($calls as $call) {
+                            $result = $executor->execute($call, $messages);
+                            $results[] = $result;
+                            $messages[] = $this->toolMessage($result);
+                        }
+
+                        array_push($toolResults, ...$results);
+                    }
+
+                    $stop = $this->stepFinished(new StepResult($step, $state->text(), $calls, $results, $state->finishReason(), $state->usage()));
+
+                    if ($calls === [] || $stop) {
+                        return;
+                    }
                 }
+            } catch (\Throwable $error) {
+                $trace->fail($error);
+
+                throw $error;
             }
         })();
 
-        return new Stream($parts, function (StreamState $state) use (&$toolCalls, &$toolResults, &$totalUsage, &$finalState): TextResult {
+        return new Stream($parts, function (StreamState $state) use ($trace, &$toolCalls, &$toolResults, &$totalUsage, &$finalState): TextResult {
             $final = $finalState instanceof StreamState ? $finalState : $state;
 
-            return new TextResult(
-                text: $final->text(),
-                reasoning: $final->reasoning(),
-                output: $this->decodeStructured($final->text()),
-                toolCalls: $toolCalls === [] ? $final->toolCalls() : $toolCalls,
-                toolResults: $toolResults,
-                finishReason: $final->finishReason(),
-                usage: $final->usage(),
-                providerMetadata: $final->providerMetadata(),
-                totalUsage: $totalUsage,
-                response: $final->response(),
-            );
+            try {
+                return new TextResult(
+                    text: $final->text(),
+                    reasoning: $final->reasoning(),
+                    output: $this->decodeStructured($final->text()),
+                    toolCalls: $toolCalls === [] ? $final->toolCalls() : $toolCalls,
+                    toolResults: $toolResults,
+                    finishReason: $final->finishReason(),
+                    usage: $final->usage(),
+                    providerMetadata: $final->providerMetadata(),
+                    totalUsage: $totalUsage,
+                    response: $final->response(),
+                    runContext: $trace->finish($totalUsage),
+                );
+            } catch (\Throwable $error) {
+                $trace->fail($error);
+
+                throw $error;
+            }
         });
     }
 
     /**
      * @param  array<int, Tool>  $tools
      */
-    private function executor(array $tools): ToolExecutor
+    private function executor(array $tools, \AiSdk\Observability\RunTrace $trace): ToolExecutor
     {
-        return new ToolExecutor($tools, $this->throwOnToolError, $this->exposeToolErrors);
+        return new ToolExecutor($tools, $this->throwOnToolError, $this->exposeToolErrors, trace: $trace);
     }
 
     private function toolMessage(ToolResult $result): Message
@@ -277,7 +338,7 @@ final class PendingTextRequest
      * @param  array<int, ToolCall>  $toolCalls
      * @param  array<int, ToolResult>  $toolResults
      */
-    private function resultFromResponse(TextModelResponse $response, array $toolCalls, array $toolResults, Usage $totalUsage): TextResult
+    private function resultFromResponse(TextModelResponse $response, array $toolCalls, array $toolResults, Usage $totalUsage, \AiSdk\Observability\RunTrace $trace): TextResult
     {
         return new TextResult(
             text: $response->text(),
@@ -291,6 +352,7 @@ final class PendingTextRequest
             providerMetadata: $response->providerMetadata,
             totalUsage: $totalUsage,
             response: $response->response,
+            runContext: $trace->finish($totalUsage),
         );
     }
 

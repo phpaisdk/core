@@ -35,6 +35,7 @@ final readonly class ToolExecutor
         private bool $throwOnError = false,
         private bool $exposeErrors = false,
         private bool $approved = false,
+        private ?\AiSdk\Observability\RunTrace $trace = null,
     ) {}
 
     /**
@@ -42,9 +43,38 @@ final readonly class ToolExecutor
      */
     public function execute(ToolCall $call, array $messages): ToolResult
     {
+        $start = hrtime(true);
+        $this->trace?->emit(new \AiSdk\Observability\Events\ToolStarted($this->trace->context, $call->name, $call->id));
+        $errorClass = null;
+
+        try {
+            $result = $this->perform($call, $messages, $errorClass);
+        } catch (Throwable $error) {
+            $this->toolFailed($call, $start, $error::class);
+
+            throw $error;
+        }
+        if ($result->isError) {
+            $this->toolFailed($call, $start, $errorClass ?? \AiSdk\Exceptions\ToolExecutionException::class);
+        } else {
+            $this->trace?->emit(new \AiSdk\Observability\Events\ToolFinished($this->trace->context, $call->name, $call->id, (int) ((hrtime(true) - $start) / 1000)));
+        }
+
+        return $result;
+    }
+
+    private function toolFailed(ToolCall $call, int $start, string $errorClass): void
+    {
+        $this->trace?->emit(new \AiSdk\Observability\Events\ToolFailed($this->trace->context, $call->name, $call->id, (int) ((hrtime(true) - $start) / 1000), $errorClass));
+    }
+
+    /** @param array<int, Message> $messages */
+    private function perform(ToolCall $call, array $messages, ?string &$errorClass): ToolResult
+    {
         $tool = $this->find($call->name);
 
         if ($tool === null) {
+            $errorClass = NoSuchToolException::class;
             if ($this->throwOnError) {
                 throw NoSuchToolException::for($call->name);
             }
@@ -63,11 +93,13 @@ final readonly class ToolExecutor
             toolName: $call->name,
             arguments: $call->arguments,
             messages: $messages,
+            runContext: $this->trace?->context,
         );
 
         try {
             return new ToolResult($call->id, $tool->name(), $tool->call($call->arguments, $context));
         } catch (Throwable $error) {
+            $errorClass = $error::class;
             if ($this->throwOnError) {
                 throw $error;
             }

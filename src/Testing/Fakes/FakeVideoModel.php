@@ -13,6 +13,8 @@ use AiSdk\Results\VideoData;
 
 final class FakeVideoModel extends BaseModel implements VideoModelInterface
 {
+    use FailsModelOperations;
+
     public ?VideoRequest $lastRequest = null;
 
     private int $polls = 0;
@@ -31,6 +33,7 @@ final class FakeVideoModel extends BaseModel implements VideoModelInterface
 
     public function generate(VideoRequest $request): VideoJob
     {
+        $this->failIfRequested();
         $this->lastRequest = $request;
 
         return new VideoJob('fake-job', $this->provider(), $this->id);
@@ -38,6 +41,7 @@ final class FakeVideoModel extends BaseModel implements VideoModelInterface
 
     public function poll(VideoJob $job): VideoJob
     {
+        $this->failIfRequested();
         $this->polls++;
 
         return $this->polls >= $this->pollsUntilComplete ? new VideoJob($job->id, $job->provider, $job->modelId, VideoJobStatus::Succeeded, new VideoData(url: 'https://example.com/video.mp4')) : new VideoJob($job->id, $job->provider, $job->modelId, VideoJobStatus::Running);

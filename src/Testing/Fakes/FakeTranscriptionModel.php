@@ -12,6 +12,8 @@ use AiSdk\Results\TranscriptData;
 
 final class FakeTranscriptionModel extends BaseModel implements TranscriptionModelInterface
 {
+    use FailsModelOperations;
+
     public ?TranscriptionRequest $lastRequest = null;
 
     public function __construct(private readonly TranscriptionResponse $response) {}
@@ -28,6 +30,7 @@ final class FakeTranscriptionModel extends BaseModel implements TranscriptionMod
 
     public function transcribe(TranscriptionRequest $request): TranscriptionResponse
     {
+        $this->failIfRequested();
         $this->lastRequest = $request;
 
         return $this->response;

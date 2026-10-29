@@ -11,6 +11,8 @@ use AiSdk\Responses\DecisionModelResponse;
 
 final class FakeDecisionModel extends BaseModel implements DecisionModelInterface
 {
+    use FailsModelOperations;
+
     /** @var list<DecisionModelRequest> */
     public array $requests = [];
     public function __construct(private readonly DecisionModelResponse $response) {}
@@ -24,6 +26,7 @@ final class FakeDecisionModel extends BaseModel implements DecisionModelInterfac
     }
     public function decide(DecisionModelRequest $request): DecisionModelResponse
     {
+        $this->failIfRequested();
         $this->requests[] = $request;
 
         return $this->response;

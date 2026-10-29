@@ -12,6 +12,8 @@ use AiSdk\Results\AudioData;
 
 final class FakeSpeechModel extends BaseModel implements SpeechModelInterface
 {
+    use FailsModelOperations;
+
     public ?SpeechRequest $lastRequest = null;
 
     public function __construct(private readonly SpeechResponse $response) {}
@@ -28,6 +30,7 @@ final class FakeSpeechModel extends BaseModel implements SpeechModelInterface
 
     public function generate(SpeechRequest $request): SpeechResponse
     {
+        $this->failIfRequested();
         $this->lastRequest = $request;
 
         return $this->response;

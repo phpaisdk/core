@@ -12,18 +12,26 @@ use AiSdk\Contracts\TextModelInterface;
 use AiSdk\Exceptions\ApprovalException;
 use AiSdk\Exceptions\InvalidArgumentException;
 use AiSdk\Exceptions\InvalidResponseException;
+use AiSdk\Observability\Events;
+use AiSdk\Observability\ObservedTextModel;
+use AiSdk\Observability\RunContext;
+use AiSdk\Observability\RunEvent;
+use AiSdk\Observability\RunTrace;
 use AiSdk\Requests\TextModelRequest;
 use AiSdk\Results\TextResult;
 use AiSdk\Support\Json;
 use AiSdk\Support\ModelResolver;
 use AiSdk\Support\ToolExecutor;
 use AiSdk\Support\Usage;
+use Closure;
+use Throwable;
 
 /** Reusable, bounded agent. Conversation and durable storage belong to the application. */
 final readonly class Agent
 {
     /**
-     * @param list<Tool> $tools */
+     * @param list<Tool> $tools
+     * @param list<Events|Closure> $listeners */
     public function __construct(
         private Model $model,
         private string $instructions = '',
@@ -33,6 +41,7 @@ final readonly class Agent
         private ?string $signingKey = null,
         private string $id = 'default',
         private int $approvalTtl = 900,
+        private array $listeners = [],
     ) {
         if ($maxSteps < 1 || $approvalTtl < 1 || $id === '') {
             throw new InvalidArgumentException('Agent requires a positive step limit, positive approval TTL and nonempty id.');
@@ -49,9 +58,30 @@ final readonly class Agent
         }
     }
 
+    /** @param Events|callable(RunEvent): void $listener */
+    public function onEvent(Events|callable $listener): self
+    {
+        return new self($this->model, $this->instructions, $this->tools, $this->maxSteps, $this->store, $this->signingKey, $this->id, $this->approvalTtl, [...$this->listeners, $listener instanceof Events ? $listener : Closure::fromCallable($listener)]);
+    }
+
+    /**
+     * Run as a child without ambient state; callers explicitly supply the parent context.
+     * @param string|list<Message> $prompt
+     */
+    public function runWithContext(string|array $prompt, RunContext $parent, string $scope = ''): AgentResult
+    {
+        return $this->startRun($prompt, $scope, $parent);
+    }
+
     /**
      * @param string|list<Message> $prompt */
     public function run(string|array $prompt, string $scope = ''): AgentResult
+    {
+        return $this->startRun($prompt, $scope);
+    }
+
+    /** @param string|list<Message> $prompt */
+    private function startRun(string|array $prompt, string $scope, ?RunContext $parent = null): AgentResult
     {
         $messages = is_string($prompt) ? [Message::user($prompt)] : $prompt;
         foreach ($messages as $message) {
@@ -64,7 +94,16 @@ final readonly class Agent
             throw new InvalidArgumentException('Agent requires messages.');
         }
 
-        return $this->advance($messages, $this->maxSteps, Usage::empty(), $scope);
+        $trace = new RunTrace(RunContext::start($parent), $this->listeners);
+        $trace->start();
+
+        try {
+            return $this->advance($messages, $this->maxSteps, Usage::empty(), $scope, $trace);
+        } catch (Throwable $error) {
+            $trace->fail($error);
+
+            throw $error;
+        }
     }
 
     /**
@@ -89,13 +128,21 @@ final readonly class Agent
 
             throw new ApprovalException('Supply one boolean decision for every approval.');
         }
-        $messages = $this->execute($checkpoint->messages, $checkpoint->calls, $decisions);
+        $trace = new RunTrace($checkpoint->runContext ?? RunContext::start(), $this->listeners);
 
-        if ($checkpoint->remainingSteps < 1) {
-            return new AgentResult($this->lastStep($checkpoint), $messages, $checkpoint->usage, stepLimitReached: true);
+        try {
+            $messages = $this->execute($checkpoint->messages, $checkpoint->calls, $decisions, $trace);
+
+            if ($checkpoint->remainingSteps < 1) {
+                return new AgentResult($this->lastStep($checkpoint), $messages, $checkpoint->usage, stepLimitReached: true, runContext: $trace->finish($checkpoint->usage));
+            }
+
+            return $this->advance($messages, $checkpoint->remainingSteps, $checkpoint->usage, $scope, $trace, $checkpoint->completedSteps);
+        } catch (Throwable $error) {
+            $trace->fail($error);
+
+            throw $error;
         }
-
-        return $this->advance($messages, $checkpoint->remainingSteps, $checkpoint->usage, $scope);
     }
 
     /** The step that requested approval, so a budget-exhausted resume still reports a result. */
@@ -113,18 +160,21 @@ final readonly class Agent
 
     /**
      * @param list<Message> $messages */
-    private function advance(array $messages, int $remaining, Usage $usage, string $scope): AgentResult
+    private function advance(array $messages, int $remaining, Usage $usage, string $scope, RunTrace $trace, int $completedSteps = 0): AgentResult
     {
         $model = ModelResolver::resolve($this->model, TextModelInterface::class, 'Agent');
+        $model = new ObservedTextModel($model, $trace->modelEvent(...), $trace->context);
         $result = null;
         for (; $remaining > 0; $remaining--) {
+            $trace->stepStarted(++$completedSteps);
             $response = $model->generate(new TextModelRequest($messages, system: $this->instructions, tools: $this->tools));
             $usage = $usage->add($response->usage);
             $calls = array_values($response->toolCalls());
+            $trace->stepFinished($completedSteps, $response->usage, $response->finishReason, $calls);
             $messages[] = Message::assistant($response->text(), toolCalls: $calls);
             $result = new TextResult($response->text(), reasoning: $response->reasoning(), toolCalls: $calls, finishReason: $response->finishReason, usage: $response->usage, rawResponse: $response->rawResponse, providerMetadata: $response->providerMetadata, totalUsage: $usage, response: $response->response);
             if ($calls === []) {
-                return new AgentResult($result, $messages, $usage);
+                return new AgentResult($result, $messages, $usage, runContext: $trace->finish($usage));
             }
             $seen = [];
             foreach ($calls as $call) {
@@ -139,15 +189,17 @@ final readonly class Agent
                     throw new ApprovalException('A nonempty application authorization scope and checkpoint storage are required for approval.');
                 }
                 $key = bin2hex(random_bytes(32));
-                $this->store->put($key, new AgentCheckpoint($scope, $this->id, time() + $this->approvalTtl, $messages, $calls, array_map(static fn(ToolCall $call): string => $call->id, $approvals), $remaining - 1, $usage));
+                $this->store->put($key, new AgentCheckpoint($scope, $this->id, time() + $this->approvalTtl, $messages, $calls, array_map(static fn(ToolCall $call): string => $call->id, $approvals), $remaining - 1, $usage, $trace->context, $completedSteps));
                 $token = $key . '.' . hash_hmac('sha256', Json::encode([$key, $scope, $this->id]), $this->signingKey);
 
-                return new AgentResult($result, $messages, $usage, $approvals, $token);
+                $trace->emit(new \AiSdk\Observability\Events\RunPaused($trace->context, $usage));
+
+                return new AgentResult($result, $messages, $usage, $approvals, $token, runContext: $trace->context);
             }
-            $messages = $this->execute($messages, $calls, []);
+            $messages = $this->execute($messages, $calls, [], $trace);
         }
 
-        return new AgentResult($result, $messages, $usage, stepLimitReached: true);
+        return new AgentResult($result, $messages, $usage, stepLimitReached: true, runContext: $trace->finish($usage));
     }
 
     private function requiresApproval(ToolCall $call): bool
@@ -166,10 +218,10 @@ final readonly class Agent
      * @param list<ToolCall> $calls
      * @param array<string, bool> $decisions
      * @return list<Message> */
-    private function execute(array $messages, array $calls, array $decisions): array
+    private function execute(array $messages, array $calls, array $decisions, RunTrace $trace): array
     {
-        $executor = new ToolExecutor($this->tools);
-        $approvedExecutor = new ToolExecutor($this->tools, approved: true);
+        $executor = new ToolExecutor($this->tools, trace: $trace);
+        $approvedExecutor = new ToolExecutor($this->tools, approved: true, trace: $trace);
         foreach ($calls as $call) {
             $result = match (true) {
                 ($decisions[$call->id] ?? null) === false => new ToolResult($call->id, $call->name, ['error' => 'Tool execution denied by the user.'], isError: true),
