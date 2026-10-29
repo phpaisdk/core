@@ -2,7 +2,7 @@
 
 Notable changes to `aisdk/core`. Release notes are also published at https://github.com/phpaisdk/core/releases.
 
-## Unreleased (v0.10.1)
+## v0.10.1 — 2026-10-29
 
 - Error messages from providers are redacted for echoed credentials and capped in length; odd error bodies no longer raise PHP warnings.
 - A bad API key reported as HTTP 400 (xAI, Google) is now an `AuthenticationException`; `Retry-After` HTTP dates are understood.
@@ -12,6 +12,7 @@ Notable changes to `aisdk/core`. Release notes are also published at https://git
 - New `ApprovalException`; agent approval, decision and configuration errors are SDK exceptions instead of native PHP ones. A malformed approval submission keeps the approval pending.
 - `maxTokens`, `temperature`, `topP` and blank prompts are validated before any request; `files()` on a provider without file storage throws `CapabilityNotSupportedException`.
 - Credential redaction covers suffix-style parameters and AWS and GitHub token shapes.
+- Allow Guzzle 8 alongside Guzzle 7 (`^7.15.2 || ^8.3.0`), tested on both in CI.
 
 ## v0.10.0 — 2026-10-29
 
