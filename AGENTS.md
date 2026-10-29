@@ -73,3 +73,7 @@ Provider packages install a released copy of core in their own `vendor/`. To che
 - https://phpaisdk.com/llms.txt (index) and https://phpaisdk.com/llms-full.txt (everything)
 - Any docs page as Markdown: append `.md`, e.g. https://phpaisdk.com/docs/tools.md
 - API reference: https://phpaisdk.com/api-reference/generate.md
+
+## Changelog
+
+Keep `CHANGELOG.md` current: add short, user-facing entries (what users can do now, dependency compatibility) for every release. Release notes on GitHub should match.
