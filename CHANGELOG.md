@@ -4,6 +4,8 @@ Notable changes to `aisdk/core`. Release notes are also published at https://git
 
 ## Unreleased (v0.11.0)
 
+- Override or add agent tools by name with immutable `withTools()` clones, and remove tools with `without()`.
+
 - Delegate work with `Agent::asTool()`, shared bounded nesting, cycle detection, child run events, cumulative usage, and approval tokens that resume the child before continuing its parent.
 - Inspect assistant tool-call announcements while approvals are pending; unknown calls settle as errors, and removed or no-longer-approvable tools cannot block or execute during resume. Approval applies equally to `Tool` subclasses.
 - Wrap each agent generation step with immutable request middleware, validated short-circuits, `Stop` predicates, and resumable `StepBudget` limits.

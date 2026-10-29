@@ -58,7 +58,7 @@ final readonly class Agent
         $this->identity = $identity ?? bin2hex(random_bytes(16));
         $names = [];
         foreach ($tools as $tool) {
-            if ($tool->name() === '' || isset($names[$tool->name()])) {
+            if (! $tool instanceof Tool || $tool->name() === '' || isset($names[$tool->name()])) {
                 throw new InvalidArgumentException('Agent tool names must be unique and nonempty.');
             }
             $names[$tool->name()] = true;
@@ -77,6 +77,38 @@ final readonly class Agent
     public function withMiddleware(\AiSdk\Agents\Middleware ...$middleware): self
     {
         return new self($this->model, $this->instructions, $this->tools, $this->maxSteps, $this->store, $this->signingKey, $this->id, $this->approvalTtl, $this->listeners, [...$this->middleware, ...array_values($middleware)], $this->maxDepth, $this->identity);
+    }
+
+    public function withTools(Tool ...$tools): static
+    {
+        $merged = $this->tools;
+        $seen = [];
+        foreach ($tools as $tool) {
+            $name = $tool->name();
+            if ($name === '' || isset($seen[$name])) {
+                throw new InvalidArgumentException('Runtime tool names must be unique and nonempty.');
+            }
+            $seen[$name] = true;
+            $replaced = false;
+            foreach ($merged as $index => $existing) {
+                if ($existing->name() === $name) {
+                    $merged[$index] = $tool;
+                    $replaced = true;
+                }
+            }
+            if (! $replaced) {
+                $merged[] = $tool;
+            }
+        }
+
+        return new static($this->model, $this->instructions, $merged, $this->maxSteps, $this->store, $this->signingKey, $this->id, $this->approvalTtl, $this->listeners, $this->middleware, $this->maxDepth, $this->identity);
+    }
+
+    public function without(string ...$names): static
+    {
+        $tools = array_values(array_filter($this->tools, static fn(Tool $tool): bool => ! in_array($tool->name(), $names, true)));
+
+        return new static($this->model, $this->instructions, $tools, $this->maxSteps, $this->store, $this->signingKey, $this->id, $this->approvalTtl, $this->listeners, $this->middleware, $this->maxDepth, $this->identity);
     }
 
     public function asTool(string $name, string $description, ?Schema $input = null): Tool
