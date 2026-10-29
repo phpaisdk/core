@@ -4,17 +4,20 @@ Notable changes to `aisdk/core`. Release notes are also published at https://git
 
 ## Unreleased (v0.11.0)
 
+- Implement portable, owner-scoped conversation persistence with `ConversationStore`, paginated messages and steps, reasoning/citations, and bounded in-memory and recording test stores.
 - Discover bounded `SKILL.md` instructions from application-chosen directories with `SkillLoader`, expose them through `Agent::withSkills()`, and read skill text/resources using `LoadSkill` without executing scripts.
-
 - Stream agents with typed provider parts and run events, the same middleware and tool loop as `run()`, and approval pause/resume via `resumeStream()`.
-
 - Override or add agent tools by name with immutable `withTools()` clones, and remove tools with `without()`.
-
 - Delegate work with `Agent::asTool()`, shared bounded nesting, cycle detection, child run events, cumulative usage, and approval tokens that resume the child before continuing its parent.
 - Inspect assistant tool-call announcements while approvals are pending; unknown calls settle as errors, and removed or no-longer-approvable tools cannot block or execute during resume. Approval applies equally to `Tool` subclasses.
 - Wrap each agent generation step with immutable request middleware, validated short-circuits, `Stop` predicates, and resumable `StepBudget` limits.
 - Observe agent and text tool-loop runs with a shared invocation id, step and tool events, timings, safe failures, and approval-resume continuity. Register isolated listeners with `onEvent()` and test with `RecordingEvents`.
 - Observe successes and failures for image, speech, transcription, embedding, decision, and video model operations with `observe()`.
+
+### Breaking
+
+- Agents now reject malformed responses, negative usage, and responses with more than 4096 typed parts. Custom adapters emitting larger responses must coalesce their parts.
+- A pending approval call whose tool was removed or lost its approval flag settles as an error on resume, rather than running that handler.
 
 ## v0.10.2 — 2026-10-29
 

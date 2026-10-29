@@ -756,3 +756,25 @@ A manifest uses `---` frontmatter with `name` and `description`, followed by Mar
 `SkillLoader::load()` returns the skill values; `snapshot()` freezes the advertised manifest set; `read($name, $resource = null)` returns the body or a named UTF-8 resource file. `new LoadSkill($loader)` exposes the same read through `Tool`, with `name` and optional `resource` inputs. Resources must be relative paths inside that skill's canonical directory; traversal, stream wrappers, symlinks and non-regular files fail. Inline skills have no filesystem resources. Scripts can be returned as text but are never executed, included or evaluated.
 
 Reads default to 256 KiB per file (configurable up to 16 MiB), discovery defaults to 100 manifests (up to 1000), and at most 32 roots and 4096 directory entries are examined. Frontmatter is limited to 16 KiB; resource paths to 4096 bytes and 32 segments. File size and identity are checked around bounded reads. Applications choose trusted roots and remain responsible for filesystem ownership and access policy.
+
+## Conversation storage contracts (0.11)
+
+`AiSdk\Conversations\ConversationStore` defines application-owned storage. Core does not automatically persist agent history or choose a database. Application/framework packages implement this interface using their own authorization, serialization, transactions and retention policy:
+
+```php
+interface ConversationStore
+{
+    public function appendMessage(string $ownerKey, string $conversationId, StoredMessage $message): void;
+    public function appendStep(string $ownerKey, string $conversationId, StoredStep $step): void;
+    public function load(string $ownerKey, string $conversationId, ?string $cursor = null, int $limit = 50): ConversationPage;
+    public function listByOwner(string $ownerKey, ?string $cursor = null, int $limit = 50): ConversationList;
+}
+```
+
+Every operation includes an opaque application-owned owner key. Supply it from authenticated application context. Implementations must isolate owners and scope cursors to the owner, conversation and operation. Missing histories return empty pages. `load()` preserves append order across messages and steps; `listByOwner()` preserves first-append order. Pages contain at most 1000 items. Appends should be atomic and duplicate record ids within the same kind/conversation must fail without changing existing data.
+
+Immutable `StoredMessage` values contain the `Message`, its tool calls, optional tool results, reasoning, citations and creation timestamp. `StoredStep` contains invocation and parent invocation ids, step index, usage, finish reason, tool calls/results, reasoning, citations, message-id references and timestamp. `Citation` carries an id, optional title, URI and excerpt without fetching it. `ConversationInfo` reports actual message/step counts; `ConversationPage` and `ConversationList` expose opaque `nextCursor` values. These values impose no persistence encoding.
+
+`InMemoryConversationStore` is a bounded process-local reference implementation. Defaults: 1000 conversations, 10,000 entries, and a 16 MiB public-data size budget, configurable in its constructor. Individual records are capped at 1 MiB, 32 nesting levels and 32,768 inspected values; arrays at 4096 elements. It inspects public data without calling serializers or accessors and accepts binary text. It does not deep-copy application-owned nested objects. Cursors are authenticated with an instance-local key and cannot be reused across instances. This is test/reference storage, not durable storage or a cross-process lock.
+
+`Testing\Fakes\FakeConversationStore` implements the same contract, records bounded operation calls, and supports `failWith(ConversationException)` for scripted storage failures. The application still decides which messages and events to append, handles attachment persistence, and authorizes every read and write.
