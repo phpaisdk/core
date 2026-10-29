@@ -13,6 +13,8 @@ Notable changes to `aisdk/core`. Release notes are also published at https://git
 
 ## Unreleased (v0.11.0)
 
+- Inspect assistant tool-call announcements while approvals are pending; unknown calls settle as errors, and removed or no-longer-approvable tools cannot block or execute during resume. Approval applies equally to `Tool` subclasses.
+
 - Wrap each agent generation step with immutable request middleware, validated short-circuits, `Stop` predicates, and resumable `StepBudget` limits.
 
 - Observe agent and text tool-loop runs with a shared invocation id, step and tool events, timings, safe failures, and approval-resume continuity. Register isolated listeners with `onEvent()` and test with `RecordingEvents`.

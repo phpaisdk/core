@@ -125,11 +125,16 @@ final readonly class Agent
         if ($checkpoint === null || $checkpoint->expiresAt <= time() || $checkpoint->scope !== $scope || $checkpoint->agent !== $this->id) {
             throw new ApprovalException('Approval checkpoint is expired, already consumed, or invalid.');
         }
+        $tools = $checkpoint->toolNames === null ? $this->tools : array_values(array_filter($this->tools, static fn(Tool $tool): bool => in_array($tool->name(), $checkpoint->toolNames, true)));
+        $unavailable = [];
+        foreach ($checkpoint->calls as $call) {
+            if (in_array($call->id, $checkpoint->approvalIds, true) && ! $this->requiresApproval($call, $tools)) {
+                $unavailable[] = $call->id;
+            }
+        }
         $ids = array_keys($decisions);
-        $expected = $checkpoint->approvalIds;
-        sort($ids);
-        sort($expected);
-        if ($ids !== $expected || array_filter($decisions, static fn($decision): bool => ! is_bool($decision)) !== []) {
+        $expected = array_diff($checkpoint->approvalIds, $unavailable);
+        if (array_diff($expected, $ids) !== [] || array_diff($ids, $checkpoint->approvalIds) !== [] || array_filter($decisions, static fn($decision): bool => ! is_bool($decision)) !== []) {
             // The token was authentic and unexpired, so a malformed submission must not destroy the pending approval.
             $this->store->put($payload, $checkpoint);
 
@@ -143,7 +148,8 @@ final readonly class Agent
                 $checkpoint->calls,
                 $decisions,
                 $trace,
-                $checkpoint->toolNames === null ? $this->tools : array_values(array_filter($this->tools, static fn(Tool $tool): bool => in_array($tool->name(), $checkpoint->toolNames, true))),
+                $tools,
+                $unavailable,
             );
 
             if ($checkpoint->remainingSteps < 1) {
@@ -168,7 +174,7 @@ final readonly class Agent
             }
         }
 
-        return new TextResult($assistant?->text() ?? '', toolCalls: $checkpoint->calls, finishReason: FinishReason::ToolCalls, totalUsage: $checkpoint->usage);
+        return new TextResult($assistant?->text() ?? '', toolCalls: $assistant->toolCalls ?? $checkpoint->calls, finishReason: FinishReason::ToolCalls, totalUsage: $checkpoint->usage);
     }
 
     /**
@@ -208,8 +214,18 @@ final readonly class Agent
                 if ($scope === '' || $this->store === null || $this->signingKey === null) {
                     throw new ApprovalException('A nonempty application authorization scope and checkpoint storage are required for approval.');
                 }
+                // Unknown siblings cannot request approval and have no handler to run. Settle them now.
+                $pending = [];
+                foreach ($calls as $call) {
+                    $known = array_filter($stepTools, static fn(Tool $tool): bool => $tool->name() === $call->name) !== [];
+                    if ($known) {
+                        $pending[] = $call;
+                    } else {
+                        $messages = $this->execute($messages, [$call], [], $trace, $stepTools);
+                    }
+                }
                 $key = bin2hex(random_bytes(32));
-                $this->store->put($key, new AgentCheckpoint($scope, $this->id, time() + $this->approvalTtl, $messages, $calls, array_map(static fn(ToolCall $call): string => $call->id, $approvals), $outcome->stepLimitReached ? 0 : $remaining - 1, $usage, $trace->context, $completedSteps, array_map(static fn(Tool $tool): string => $tool->name(), $stepTools)));
+                $this->store->put($key, new AgentCheckpoint($scope, $this->id, time() + $this->approvalTtl, $messages, $pending, array_map(static fn(ToolCall $call): string => $call->id, $approvals), $outcome->stepLimitReached ? 0 : $remaining - 1, $usage, $trace->context, $completedSteps, array_map(static fn(Tool $tool): string => $tool->name(), $stepTools)));
                 $token = $key . '.' . hash_hmac('sha256', Json::encode([$key, $scope, $this->id]), $this->signingKey);
 
                 $trace->emit(new \AiSdk\Observability\Events\RunPaused($trace->context, $usage));
@@ -242,13 +258,15 @@ final readonly class Agent
      * @param list<ToolCall> $calls
      * @param array<string, bool> $decisions
      * @param array<int, Tool>|null $tools
+     * @param list<string> $unavailable
      * @return list<Message> */
-    private function execute(array $messages, array $calls, array $decisions, RunTrace $trace, ?array $tools = null): array
+    private function execute(array $messages, array $calls, array $decisions, RunTrace $trace, ?array $tools = null, array $unavailable = []): array
     {
         $executor = new ToolExecutor($tools ?? $this->tools, trace: $trace);
         $approvedExecutor = new ToolExecutor($tools ?? $this->tools, approved: true, trace: $trace);
         foreach ($calls as $call) {
             $result = match (true) {
+                in_array($call->id, $unavailable, true) => $this->unavailableApproval($call, $trace),
                 ($decisions[$call->id] ?? null) === false => new ToolResult($call->id, $call->name, ['error' => 'Tool execution denied by the user.'], isError: true),
                 ($decisions[$call->id] ?? null) === true => $approvedExecutor->execute($call, $messages),
                 default => $executor->execute($call, $messages),
@@ -257,5 +275,13 @@ final readonly class Agent
         }
 
         return $messages;
+    }
+
+    private function unavailableApproval(ToolCall $call, RunTrace $trace): ToolResult
+    {
+        $trace->emit(new \AiSdk\Observability\Events\ToolStarted($trace->context, $call->name, $call->id));
+        $trace->emit(new \AiSdk\Observability\Events\ToolFailed($trace->context, $call->name, $call->id, 0, ApprovalException::class));
+
+        return new ToolResult($call->id, $call->name, ['error' => 'The pending tool is no longer available for approval.'], isError: true);
     }
 }

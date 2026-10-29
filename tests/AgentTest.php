@@ -152,3 +152,79 @@ it('still reports a result when approval is resolved on the last allowed step', 
     $done = $agent->resume($paused->resumeToken, ['call' => true], 'user');
     expect($done->stepLimitReached)->toBeTrue()->and($done->result)->not->toBeNull()->and($done->result->text)->toBe('about to act');
 });
+
+it('announces approval calls in assistant messages before requesting approval', function () {
+    $model = new FakeTextModel(new TextModelResponse([new TextPart('I will send the message'), new ToolCallPart('a', 'send', [])], FinishReason::ToolCalls, Usage::empty()));
+    $agent = new Agent($model, tools: [Tool::make('send')->needsApproval()->run(fn() => 'ok')], store: approvalStore(), signingKey: str_repeat('x', 32));
+    $paused = $agent->run('hi', 'owner');
+    expect($paused->messages[1]->role)->toBe(\AiSdk\Message::ROLE_ASSISTANT)
+        ->and($paused->messages[1]->text())->toBe('I will send the message')
+        ->and($paused->messages[1]->toolCalls)->toBe($paused->approvals);
+});
+
+it('gates class based and remote Tool subclasses through the same approval check', function () {
+    $tool = new class extends Tool {
+        public int $executions = 0;
+        public function __construct()
+        {
+            parent::__construct('remote', 'A remote application tool');
+        }
+        public function call(array $args, ?\AiSdk\ToolExecutionContext $context = null): mixed
+        {
+            $this->executions++;
+
+            return 'ok';
+        }
+    };
+    $tool->needsApproval();
+    $model = FakeTextModel::scripted([
+        new TextModelResponse([new ToolCallPart('a', 'remote', [])], FinishReason::ToolCalls, Usage::empty()),
+        new TextModelResponse([new TextPart('done')], FinishReason::Stop, Usage::empty()),
+    ]);
+    $agent = new Agent($model, tools: [$tool], store: approvalStore(), signingKey: str_repeat('x', 32));
+    $paused = $agent->run('hi', 'owner');
+    expect($tool->executions)->toBe(0);
+    $agent->resume($paused->resumeToken, ['a' => true], 'owner');
+    expect($tool->executions)->toBe(1);
+});
+
+it('settles unknown paused siblings immediately without asking for approval or executing known siblings', function () {
+    $executions = 0;
+    $model = FakeTextModel::scripted([
+        new TextModelResponse([new ToolCallPart('missing', 'unknown', []), new ToolCallPart('a', 'send', [])], FinishReason::ToolCalls, Usage::empty()),
+        new TextModelResponse([new TextPart('done')], FinishReason::Stop, Usage::empty()),
+    ]);
+    $tool = Tool::make('send')->needsApproval()->run(function () use (&$executions) {
+        return ++$executions;
+    });
+    $agent = new Agent($model, tools: [$tool], store: approvalStore(), signingKey: str_repeat('x', 32));
+    $paused = $agent->run('hi', 'owner');
+    expect($paused->approvals)->toHaveCount(1)->and($executions)->toBe(0)
+        ->and($paused->messages[2]->toolCallId)->toBe('missing')->and($paused->messages[2]->text())->toContain('Unknown tool');
+    $done = $agent->resume($paused->resumeToken, ['a' => true], 'owner');
+    expect($done->result->text)->toBe('done')->and($executions)->toBe(1);
+    $settled = array_filter($done->messages, fn($message) => $message->toolCallId === 'missing');
+    expect($settled)->toHaveCount(1);
+});
+
+it('settles removed approval tools and continues remaining valid calls', function (bool $stillRegistered, bool $staleDecision) {
+    $executions = 0;
+    $model = FakeTextModel::scripted([
+        new TextModelResponse([new ToolCallPart('a', 'removed', []), new ToolCallPart('b', 'valid', [])], FinishReason::ToolCalls, Usage::empty()),
+        new TextModelResponse([new TextPart('done')], FinishReason::Stop, Usage::empty()),
+    ]);
+    $store = approvalStore();
+    $removed = Tool::make('removed')->needsApproval()->run(function () use (&$executions) {
+        $executions += 100;
+    });
+    $valid = Tool::make('valid')->needsApproval()->run(function () use (&$executions) {
+        $executions++;
+    });
+    $agent = new Agent($model, tools: [$removed, $valid], store: $store, signingKey: str_repeat('x', 32));
+    $paused = $agent->run('hi', 'owner');
+    $removed->needsApproval(false);
+    $resumedAgent = new Agent($model, tools: $stillRegistered ? [$removed, $valid] : [$valid], store: $store, signingKey: str_repeat('x', 32));
+    $done = $resumedAgent->resume($paused->resumeToken, $staleDecision ? ['a' => true, 'b' => true] : ['b' => true], 'owner');
+    expect($done->result->text)->toBe('done')->and($executions)->toBe(1)
+        ->and($done->messages[2]->toolCallId)->toBe('a')->and($done->messages[2]->text())->toContain('no longer available');
+})->with([[true, true], [true, false], [false, true], [false, false]]);
