@@ -12,7 +12,7 @@ final class Redactor
 {
     public const string MASK = '[redacted]';
 
-    private const string SENSITIVE_PARAMS = 'key|api[_-]?key|apikey|token|access[_-]?token|auth|authorization|secret|signature|sig|password|x-amz-signature|x-amz-credential|x-amz-security-token';
+    private const string SENSITIVE_PARAMS = '(?:[a-z0-9._-]*(?:key|token|secret|signature|password|passwd|credential))|auth|authorization|sig';
 
     private function __construct() {}
 
@@ -39,6 +39,8 @@ final class Redactor
         $text = preg_replace_callback('#https?://[^\s"\'<>]+|wss?://[^\s"\'<>]+#i', static fn(array $m): string => self::url($m[0]), $text) ?? $text;
         $text = preg_replace('/\b(Bearer|Basic)\s+[A-Za-z0-9._~+\/=-]{8,}/i', '$1 ' . self::MASK, $text) ?? $text;
 
-        return preg_replace('/\b(sk|pk|rk|xai|gsk|AIza|hf|r8|fal|nvapi)[-_A-Za-z0-9]{16,}\b/', self::MASK, $text) ?? $text;
+        $text = preg_replace('/\b(sk|pk|rk|xai|gsk|AIza|hf|r8|fal|nvapi)[-_A-Za-z0-9]{16,}\b/', self::MASK, $text) ?? $text;
+
+        return preg_replace('/\b(?:(?:AKIA|ASIA)[A-Z0-9]{16}|gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})\b/', self::MASK, $text) ?? $text;
     }
 }

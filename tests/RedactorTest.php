@@ -23,3 +23,11 @@ it('redacts URLs, bearer tokens and API key shapes in free text', function () {
         ->and($redacted)->not->toContain('ABCDEFGHIJKLMNOPQRSTUV')
         ->and($redacted)->toContain('cURL error for');
 });
+
+it('masks suffix-style credential parameters and cloud token shapes', function () {
+    expect(Redactor::url('https://x.test/a?client_secret=abc&refresh_token=zzz&X-Goog-Signature=dead&access_key=k&max_tokens=5'))
+        ->toBe('https://x.test/a?client_secret=[redacted]&refresh_token=[redacted]&X-Goog-Signature=[redacted]&access_key=[redacted]&max_tokens=5');
+
+    $text = Redactor::text('AKIAIOSFODNN7EXAMPLE ghp_abcdefghijklmnopqrstuvwxyz0123456789');
+    expect($text)->toBe('[redacted] [redacted]');
+});
