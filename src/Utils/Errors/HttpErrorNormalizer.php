@@ -51,7 +51,7 @@ final class HttpErrorNormalizer
         ];
 
         return match (true) {
-            $status === 401 => new AuthenticationException($message, $context, $previous),
+            $status === 401, self::isAuthenticationFailure($status, $body, $message) => new AuthenticationException($message, $context, $previous),
             $status === 403 => new PermissionDeniedException($message, $context, $previous),
             $status === 404 => new NotFoundException($message, $context, $previous),
             $status === 429 => new RateLimitException($message, $context, $previous),
@@ -60,6 +60,37 @@ final class HttpErrorNormalizer
             $status >= 400 => new InvalidRequestException($message, $context, $previous),
             default => new ProviderException($message, $context, $previous),
         };
+    }
+
+    /**
+     * Some providers answer a bad or missing API key with 400 instead of 401. Recognize those by what the body says.
+     *
+     * @param  array<int|string, mixed>|string|null  $body
+     */
+    private static function isAuthenticationFailure(int $status, array|string|null $body, string $message): bool
+    {
+        if ($status !== 400 && $status !== 403 && $status !== 404) {
+            return false;
+        }
+
+        if (is_array($body)) {
+            $error = is_array($body['error'] ?? null) ? $body['error'] : [];
+            $details = is_array($error['details'] ?? null) ? $error['details'] : [];
+
+            foreach ($details as $detail) {
+                if (is_array($detail) && in_array($detail['reason'] ?? null, ['API_KEY_INVALID', 'API_KEY_EXPIRED', 'API_KEY_NOT_FOUND'], true)) {
+                    return true;
+                }
+            }
+
+            foreach ([$error['code'] ?? null, $error['type'] ?? null, $body['code'] ?? null] as $code) {
+                if (is_string($code) && in_array(strtolower($code), ['invalid_api_key', 'incorrect_api_key', 'authentication_error', 'unauthenticated'], true)) {
+                    return true;
+                }
+            }
+        }
+
+        return $status === 400 && preg_match('/\b(?:incorrect|invalid|wrong|missing|bad|expired)\b[^.]{0,30}\bapi[ _-]?key\b|\bapi[ _-]?key\b[^.]{0,30}\b(?:not valid|invalid|incorrect|expired)\b/i', $message) === 1;
     }
 
     /**

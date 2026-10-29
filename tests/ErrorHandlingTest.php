@@ -189,3 +189,15 @@ it('fails a stream that ends without sending anything and marks cut-off output a
     })());
     expect($cut->run()->finishReason)->toBe(AiSdk\FinishReason::Unknown);
 });
+
+it('treats providers that answer a bad API key with 400 as authentication failures', function (int $status, array $body) {
+    expect(HttpErrorNormalizer::normalize('p', $status, $body))->toBeInstanceOf(AuthenticationException::class);
+})->with([
+    'xai' => [400, ['code' => 'invalid-argument', 'error' => 'Incorrect API key provided. You can obtain an API key from https://console.x.ai.']],
+    'google' => [400, ['error' => ['code' => 400, 'message' => 'API key not valid. Please pass a valid API key.', 'status' => 'INVALID_ARGUMENT', 'details' => [['reason' => 'API_KEY_INVALID']]]]],
+    'typed code' => [400, ['error' => ['code' => 'invalid_api_key', 'message' => 'nope']]],
+]);
+
+it('does not mistake ordinary bad requests for authentication failures', function () {
+    expect(HttpErrorNormalizer::normalize('p', 400, ['error' => ['message' => 'max_tokens must be positive']]))->toBeInstanceOf(AiSdk\Exceptions\InvalidRequestException::class);
+});
