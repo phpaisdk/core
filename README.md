@@ -738,3 +738,21 @@ if ($run->resumeToken !== null) {
 `AgentStream::chunks()` yields text deltas, `run()` drains remaining work and returns the final `AgentResult`, `result()` requires completion, and `isComplete()` includes approval pauses as completed stream segments. There is one active consumer; stopping iteration and later draining continues without replaying chunks or tools. Completed iteration is not replayed and no event history is buffered. A stream performs no work until consumed. Discarding a partially consumed stream leaves its work unfinished.
 
 Approval streams use the same scoped, expiring, single-use checkpoints. Resume may use `resume()` or `resumeStream()` regardless of how the pause was produced. Child run events are forwarded through a streaming parent; child model generation currently remains synchronous. Each streamed step is capped at 65,536 provider parts and 16 MiB of text, reasoning and tool argument deltas. The synchronous response's 4096-part validation and existing agent step/nesting budgets also apply.
+
+## Skills (0.11)
+
+`AiSdk\Skills\SkillLoader` discovers `SKILL.md` at each application-chosen root, or in its immediate child directories. There is no automatic home-directory search. Use `$agent->withSkills(new SkillLoader([$trustedRoot]))`, or pass a list of immutable `Skill($name, $description, $body)` values. The cloned agent advertises names and descriptions and adds the `load_skill` tool. Full instructions are read only when requested. `withSkills()` reserves that tool name and replaces any existing handler with the same name.
+
+```php
+$agent = $agent->withSkills(new AiSdk\Skills\SkillLoader(
+    roots: [__DIR__ . '/skills'],
+    maxFileBytes: 262144,
+    maxFiles: 100,
+));
+```
+
+A manifest uses `---` frontmatter with `name` and `description`, followed by Markdown. Names are lowercase letters/digits separated by single hyphens (up to 64 bytes). Descriptions are UTF-8 text up to 1024 bytes. The literal frontmatter subset supports plain, single-quoted and JSON double-quoted scalars, plus `|`/`>` descriptions. Duplicate or unsupported fields, YAML objects/tags/aliases and malformed metadata are rejected with `SkillException`; no YAML engine or code execution is used.
+
+`SkillLoader::load()` returns the skill values; `snapshot()` freezes the advertised manifest set; `read($name, $resource = null)` returns the body or a named UTF-8 resource file. `new LoadSkill($loader)` exposes the same read through `Tool`, with `name` and optional `resource` inputs. Resources must be relative paths inside that skill's canonical directory; traversal, stream wrappers, symlinks and non-regular files fail. Inline skills have no filesystem resources. Scripts can be returned as text but are never executed, included or evaluated.
+
+Reads default to 256 KiB per file (configurable up to 16 MiB), discovery defaults to 100 manifests (up to 1000), and at most 32 roots and 4096 directory entries are examined. Frontmatter is limited to 16 KiB; resource paths to 4096 bytes and 32 segments. File size and identity are checked around bounded reads. Applications choose trusted roots and remain responsible for filesystem ownership and access policy.

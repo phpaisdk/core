@@ -111,6 +111,23 @@ final readonly class Agent
         return new static($this->model, $this->instructions, $tools, $this->maxSteps, $this->store, $this->signingKey, $this->id, $this->approvalTtl, $this->listeners, $this->middleware, $this->maxDepth, $this->identity);
     }
 
+    /** @param \AiSdk\Skills\SkillLoader|list<\AiSdk\Skills\Skill> $skills */
+    public function withSkills(\AiSdk\Skills\SkillLoader|array $skills): static
+    {
+        $loader = ($skills instanceof \AiSdk\Skills\SkillLoader ? $skills : \AiSdk\Skills\SkillLoader::fromSkills($skills))->snapshot();
+        $available = $loader->load();
+        if ($available === []) {
+            return $this->withTools();
+        }
+        $instructions = $this->instructions . "\n\nAvailable skills (use load_skill to read instructions):\n";
+        foreach ($available as $skill) {
+            $instructions .= '- ' . $skill->name . ': ' . str_replace(["\r", "\n"], ' ', $skill->description) . "\n";
+        }
+        $configured = $this->withTools(new \AiSdk\Skills\LoadSkill($loader));
+
+        return new static($this->model, $instructions, $configured->tools, $this->maxSteps, $this->store, $this->signingKey, $this->id, $this->approvalTtl, $this->listeners, $this->middleware, $this->maxDepth, $this->identity);
+    }
+
     public function asTool(string $name, string $description, ?Schema $input = null): Tool
     {
         if ($name === '') {
