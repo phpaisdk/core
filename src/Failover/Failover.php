@@ -41,6 +41,11 @@ final class Failover implements ResolvableModelInterface
 
     private int $cooldownSeconds = 0;
 
+    private int $retryAfterSeconds = 5;
+
+    /** @var Closure(float): void */
+    private Closure $sleep;
+
     private FailoverState $state;
 
     /**
@@ -50,6 +55,14 @@ final class Failover implements ResolvableModelInterface
     {
         $this->models = $models;
         $this->state = new FailoverState();
+        $this->sleep = static function (float $seconds): void {
+            // Split long waits to avoid overflowing the microsecond argument.
+            $whole = (int) $seconds;
+            if ($whole > 0) {
+                sleep($whole);
+            }
+            usleep((int) (($seconds - $whole) * 1_000_000));
+        };
         $this->retryWhen = FailoverPolicy::isTransient(...);
     }
 
@@ -72,6 +85,29 @@ final class Failover implements ResolvableModelInterface
     public function retryWhen(callable $decide): self
     {
         $this->retryWhen = Closure::fromCallable($decide);
+
+        return $this;
+    }
+
+    /** Retry the same candidate once after a short Retry-After; zero disables it. */
+    public function retryAfterUpTo(int $seconds): self
+    {
+        if ($seconds < 0) {
+            throw new InvalidArgumentException('The Retry-After threshold must be non-negative.');
+        }
+        $this->retryAfterSeconds = $seconds;
+
+        return $this;
+    }
+
+    /**
+     * Replace the wait implementation; receives seconds, including fractional seconds.
+     *
+     * @param callable(float): void $sleep
+     */
+    public function sleepUsing(callable $sleep): self
+    {
+        $this->sleep = Closure::fromCallable($sleep);
 
         return $this;
     }
@@ -133,6 +169,6 @@ final class Failover implements ResolvableModelInterface
      */
     private function runner(string $contract): FailoverRunner
     {
-        return new FailoverRunner($this->models, $contract, $this->retryWhen, $this->listeners, $this->cooldownSeconds, $this->state);
+        return new FailoverRunner($this->models, $contract, $this->retryWhen, $this->listeners, $this->cooldownSeconds, $this->state, $this->retryAfterSeconds, $this->sleep);
     }
 }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace AiSdk\Failover;
 
 use AiSdk\Contracts\Model;
+use AiSdk\Exceptions\AiSdkException;
 use AiSdk\Exceptions\InvalidArgumentException;
 use AiSdk\Exceptions\NoSuchModelException;
 use AiSdk\Support\ModelResolver;
@@ -26,6 +27,7 @@ final class FailoverRunner
      * @param  class-string<T>  $contract
      * @param  Closure(Throwable): bool  $retryWhen
      * @param  list<Closure(FailoverEvent): void>  $listeners
+     * @param  Closure(float): void  $sleep
      */
     public function __construct(
         private readonly array $models,
@@ -34,6 +36,8 @@ final class FailoverRunner
         private readonly array $listeners,
         private readonly int $cooldownSeconds,
         private readonly FailoverState $state,
+        private readonly int $retryAfterSeconds,
+        private readonly Closure $sleep,
     ) {}
 
     /**
@@ -61,7 +65,14 @@ final class FailoverRunner
             }
 
             try {
-                $result = $call($adapter);
+                try {
+                    $result = $call($adapter);
+                } catch (Throwable $error) {
+                    if (! $this->waitBeforeRetry($error)) {
+                        throw $error;
+                    }
+                    $result = $call($adapter);
+                }
                 unset($this->state->coolingUntil[$this->key($model)]);
 
                 return $result;
@@ -100,10 +111,19 @@ final class FailoverRunner
             }
 
             try {
-                foreach ($call($adapter) as $part) {
-                    $started = true;
+                for ($attempt = 0; ; $attempt++) {
+                    try {
+                        foreach ($call($adapter) as $part) {
+                            $started = true;
 
-                    yield $part;
+                            yield $part;
+                        }
+                        break;
+                    } catch (Throwable $error) {
+                        if ($started || $attempt > 0 || ! $this->waitBeforeRetry($error)) {
+                            throw $error;
+                        }
+                    }
                 }
 
                 unset($this->state->coolingUntil[$this->key($model)]);
@@ -124,6 +144,24 @@ final class FailoverRunner
         }
 
         throw $last ?? new InvalidArgumentException('Failover has no models to try.');
+    }
+
+    private function waitBeforeRetry(Throwable $error): bool
+    {
+        if (! $error instanceof AiSdkException || $this->retryAfterSeconds === 0
+            || ($error->context()['retryable'] ?? null) === false || ! ($this->retryWhen)($error)) {
+            return false;
+        }
+
+        $seconds = $error->context()['retryAfter'] ?? null;
+        if ((! is_int($seconds) && ! is_float($seconds)) || ! is_finite((float) $seconds)
+            || $seconds <= 0 || $seconds > $this->retryAfterSeconds) {
+            return false;
+        }
+
+        ($this->sleep)((float) $seconds);
+
+        return true;
     }
 
     /**

@@ -4,6 +4,7 @@ Notable changes to `aisdk/core`. Release notes are also published at https://git
 
 ## Unreleased (v0.10.2)
 
+- Failover retries the same model once for short `Retry-After` delays (up to 5 seconds); configure or disable with `retryAfterUpTo()`.
 - Distinguish exhausted credits and quota with `InsufficientCreditsException` and automatically fail over to another model.
 - Structured text output accepts a surrounding Markdown JSON fence, including streamed results.
 
