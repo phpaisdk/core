@@ -2,6 +2,10 @@
 
 Notable changes to `aisdk/core`. Release notes are also published at https://github.com/phpaisdk/core/releases.
 
+## Unreleased (v0.10.2)
+
+- Structured text output accepts a surrounding Markdown JSON fence, including streamed results.
+
 ## v0.10.1 — 2026-10-29
 
 - Error messages from providers are redacted for echoed credentials and capped in length; odd error bodies no longer raise PHP warnings.

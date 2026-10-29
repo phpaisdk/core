@@ -300,7 +300,12 @@ final class PendingTextRequest
             return null;
         }
 
-        $decoded = Json::decodeValue(trim($text), 'structured output');
+        $text = trim($text);
+        if (preg_match('/\A```[a-zA-Z0-9_-]*[ \t]*\r?\n(.*)\r?\n```\z/s', $text, $fence) === 1) {
+            $text = $fence[1];
+        }
+
+        $decoded = Json::decodeValue($text, 'structured output');
 
         return $this->output->schema === null
             ? $decoded
