@@ -14,6 +14,7 @@ final readonly class AgentCheckpoint
      * @param list<Message> $messages
      * @param list<ToolCall> $calls
      * @param list<string> $approvalIds
+     * @param list<string>|null $toolNames
      */
     public function __construct(
         public string $scope,
@@ -26,5 +27,6 @@ final readonly class AgentCheckpoint
         public Usage $usage,
         public ?\AiSdk\Observability\RunContext $runContext = null,
         public int $completedSteps = 0,
+        public ?array $toolNames = null,
     ) {}
 }

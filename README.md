@@ -673,3 +673,24 @@ Approval pauses emit `RunPaused`, leave `finishedAt` unset, and preserve the con
 Tool handlers receive the context through `ToolExecutionContext::runContext`. To explicitly link other application-managed child work, use `Agent::runWithContext($prompt, $parentContext, $scope)` or `PendingTextRequest::withRunContext($parentContext)`. Both create a new invocation linked to that parent, without process-global state.
 
 All generation builders also support `observe(callable(ModelEvent): void)`. This observes provider-operation start, finish and error, includes an `operation` label, and preserves exception propagation. Video emits separate `video.generate` and `video.poll` operations. Direct calls to provider model adapters bypass builder observation. Script failures offline with any `Testing\Fakes\Fake*Model::failWith($sdkException)`.
+
+## Agent middleware (0.11)
+
+`Agent::withMiddleware(Middleware ...$middleware)` returns a new agent. Each middleware implements `handle(StepContext $step, Closure $next): StepOutcome`. First registered is outermost. `$step->request` exposes the outgoing messages, system instructions, tools and generation options; `$step->runContext`, `stepIndex` and `totalUsage` expose execution context. Pass `$step->withRequest($request)` to `$next` to change the immutable request. The downstream request is preserved in `StepOutcome::request`; use the outcome's copy methods when changing its stopping flags.
+
+Call `$next($step)` once, or skip it and return `StepOutcome::fromParts([new TextPart('cached answer')])`. Short-circuits have the same response validation, usage accounting, events and tool approval checks as generated responses. Outcomes require typed response parts, valid unique tool call ids/names and nonnegative token counts, with at most 4096 parts. At most 64 middleware layers may wrap a step. Exceptions propagate and emit `RunFailed`.
+
+```php
+use AiSdk\Agents\Middleware\StepBudget;
+use AiSdk\Agents\Middleware\Stop;
+use AiSdk\StopWhen;
+
+$agent = $agent->withMiddleware(
+    new StepBudget(5),
+    new Stop(StopWhen::toolCalled('submit_answer')),
+);
+```
+
+`Stop` evaluates a `StepResult` immediately after generation, before tool execution, with an empty tool-results list. A matching predicate ends the run with the response so far and does not execute its tool calls. `StepBudget` caps generation steps across resumes; it settles tools on the last allowed step (or pauses for approval) before returning `stepLimitReached`. The agent's constructor `maxSteps` remains the hard ceiling.
+
+Middleware may filter or replace outgoing tools. Approval checkpoints persist only the outgoing tool names, never closures; a resumed agent must supply the corresponding handlers in its configured tools. Keep runtime additions in the agent configuration when they need to survive a pause. Custom checkpoint stores should persist `toolNames` along with run identity and completed step count.

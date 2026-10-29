@@ -13,6 +13,8 @@ Notable changes to `aisdk/core`. Release notes are also published at https://git
 
 ## Unreleased (v0.11.0)
 
+- Wrap each agent generation step with immutable request middleware, validated short-circuits, `Stop` predicates, and resumable `StepBudget` limits.
+
 - Observe agent and text tool-loop runs with a shared invocation id, step and tool events, timings, safe failures, and approval-resume continuity. Register isolated listeners with `onEvent()` and test with `RecordingEvents`.
 - Observe successes and failures for image, speech, transcription, embedding, decision, and video model operations with `observe()`.
 
