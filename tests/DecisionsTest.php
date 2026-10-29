@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 use AiSdk\Decisions\Answer;
 use AiSdk\Decisions\Question;
+use AiSdk\Exceptions\InvalidArgumentException;
+use AiSdk\Exceptions\InvalidResponseException;
 use AiSdk\Generate;
 use AiSdk\Responses\DecisionModelResponse;
 use AiSdk\Testing\Fakes\FakeDecisionModel;
@@ -12,7 +14,7 @@ it('returns native probabilities and supports an explicit yes threshold', functi
     $model = new FakeDecisionModel(new DecisionModelResponse(['decision' => new Answer('predicate', 0.85)]));
     expect(Generate::decision('urgent')->model($model)->decide('Is urgent?', 0.8))->toBeTrue()
         ->and(Generate::decision('urgent')->model($model)->decide('Is urgent?', 0.9))->toBeFalse();
-    expect(fn() => Generate::decision('urgent')->model($model)->decide('Is urgent?', NAN))->toThrow(UnexpectedValueException::class);
+    expect(fn() => Generate::decision('urgent')->model($model)->decide('Is urgent?', NAN))->toThrow(InvalidArgumentException::class);
     expect($model->requests)->toHaveCount(2);
 });
 
@@ -30,7 +32,7 @@ it('keeps refusal distinct from false', function () {
 
 it('rejects unknown options missing answers and invalid distributions', function (array $answers) {
     $model = new FakeDecisionModel(new DecisionModelResponse($answers));
-    expect(fn() => Generate::decision('input')->model($model)->questions(Question::choice('team', 'Route', ['billing' => 'Payments', 'sales' => 'Sales']))->run())->toThrow(UnexpectedValueException::class);
+    expect(fn() => Generate::decision('input')->model($model)->questions(Question::choice('team', 'Route', ['billing' => 'Payments', 'sales' => 'Sales']))->run())->toThrow(InvalidResponseException::class);
 })->with([
     [[]],
     [['team' => new Answer('choice', 'unknown', 0.8, ['billing' => 0.5, 'sales' => 0.5])]],
@@ -40,7 +42,7 @@ it('rejects unknown options missing answers and invalid distributions', function
 it('validates question identity and score bounds', function () {
     expect(fn() => Generate::decision('input')->questions(Question::predicate('a', 'one'), Question::predicate('a', 'two')))->toThrow(InvalidArgumentException::class);
     $model = new FakeDecisionModel(new DecisionModelResponse(['score' => new Answer('score', 3.0, 0.5, [0 => 0.5, 1 => 0.5])]));
-    expect(fn() => Generate::decision('input')->model($model)->questions(Question::score('score', 'How bad', ['Low', 'High']))->run())->toThrow(UnexpectedValueException::class);
+    expect(fn() => Generate::decision('input')->model($model)->questions(Question::score('score', 'How bad', ['Low', 'High']))->run())->toThrow(InvalidResponseException::class);
 });
 
 

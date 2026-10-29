@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace AiSdk\Decisions;
 
+use AiSdk\Exceptions\InvalidArgumentException;
+use AiSdk\Exceptions\InvalidResponseException;
+
 /** Typed values preserve probability, uncertainty and refusal without boolean coercion. */
 final readonly class Answer
 {
@@ -15,10 +18,10 @@ final readonly class Answer
         public array $probabilities = [],
     ) {
         if (! in_array($kind, ['predicate', 'choice', 'score', 'refusal'], true)) {
-            throw new \UnexpectedValueException('Unknown decision answer type.');
+            throw new InvalidResponseException('Unknown decision answer type.');
         }
         if (($kind === 'refusal' && $value !== null) || ($kind === 'choice' && ! is_string($value)) || (in_array($kind, ['predicate', 'score'], true) && (! is_float($value) || ! is_finite($value)))) {
-            throw new \UnexpectedValueException('Decision answer value does not match its type.');
+            throw new InvalidResponseException('Decision answer value does not match its type.');
         }
         if ($kind === 'predicate') {
             self::probability($value);
@@ -33,7 +36,7 @@ final readonly class Answer
 
     public function yes(float $threshold = 0.5): bool
     {
-        self::probability($threshold);
+        self::assertThreshold($threshold);
         if ($this->kind !== 'predicate' || ! is_float($this->value)) {
             throw new \LogicException('Only a non-refused predicate can be evaluated as yes/no.');
         }
@@ -46,10 +49,19 @@ final readonly class Answer
         return $this->probabilities[$option] ?? throw new \OutOfBoundsException('No probability for this option.');
     }
 
+    /** Validates a threshold supplied by the caller. */
+    public static function assertThreshold(float $value): void
+    {
+        if (! is_finite($value) || $value < 0.0 || $value > 1.0) {
+            throw new InvalidArgumentException('A threshold must be a finite value between 0 and 1.');
+        }
+    }
+
+    /** Validates a probability received from a provider. */
     public static function probability(float $value): void
     {
         if (! is_finite($value) || $value < 0 || $value > 1) {
-            throw new \UnexpectedValueException('Probabilities must be finite values between 0 and 1.');
+            throw new InvalidResponseException('Probabilities must be finite values between 0 and 1.');
         }
     }
 }

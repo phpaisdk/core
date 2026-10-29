@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace AiSdk\Decisions;
 
 use AiSdk\Content;
+use AiSdk\Exceptions\InvalidArgumentException;
 
 final readonly class Question
 {
@@ -21,12 +22,12 @@ final readonly class Question
         public array $levels = [],
     ) {
         if ($name === '' || $instructions === '' || $instructions === []) {
-            throw new \InvalidArgumentException('Decision questions need a name and instructions.');
+            throw new InvalidArgumentException('Decision questions need a name and instructions.');
         }
         if (is_array($instructions)) {
             foreach ($instructions as $part) {
                 if (! $part instanceof Content || ! in_array($part->type, [Content::TYPE_TEXT, Content::TYPE_IMAGE], true) || $part->fileReference() !== null) {
-                    throw new \InvalidArgumentException('Question instructions support text and inline or URL images only.');
+                    throw new InvalidArgumentException('Question instructions support text and inline or URL images only.');
                 }
             }
         }
@@ -45,12 +46,12 @@ final readonly class Question
     public static function choice(string $name, string|array $instructions, array $choices): self
     {
         if (count($choices) < 2) {
-            throw new \InvalidArgumentException('Choice questions need at least two options.');
+            throw new InvalidArgumentException('Choice questions need at least two options.');
         }
         foreach ($choices as $value => $description) {
             // PHP stores numeric-string keys such as "42" as integers.
             if ((string) $value === '' || ! is_string($description)) {
-                throw new \InvalidArgumentException('Choices require nonempty string keys and string descriptions.');
+                throw new InvalidArgumentException('Choices require nonempty string keys and string descriptions.');
             }
         }
 
@@ -74,12 +75,12 @@ final readonly class Question
     private static function validatedLevels(array $levels): array
     {
         if (count($levels) < 2 || ! array_is_list($levels)) {
-            throw new \InvalidArgumentException('Score questions need an ordered list of at least two levels.');
+            throw new InvalidArgumentException('Score questions need an ordered list of at least two levels.');
         }
         $validated = [];
         foreach ($levels as $level) {
             if (! is_string($level) || $level === '') {
-                throw new \InvalidArgumentException('Score levels must be nonempty strings.');
+                throw new InvalidArgumentException('Score levels must be nonempty strings.');
             }
             $validated[] = $level;
         }

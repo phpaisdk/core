@@ -11,6 +11,7 @@ use AiSdk\Contracts\SpeechModelInterface;
 use AiSdk\Contracts\TextModelInterface;
 use AiSdk\Contracts\TranscriptionModelInterface;
 use AiSdk\Contracts\VideoModelInterface;
+use AiSdk\Exceptions\InvalidArgumentException;
 use GuzzleHttp\Client;
 use Http\Discovery\Psr17FactoryDiscovery;
 use Psr\Container\ContainerInterface;
@@ -86,7 +87,7 @@ final class SdkFactory
     public function withConnectTimeout(float $seconds): self
     {
         if ($seconds <= 0) {
-            throw new \InvalidArgumentException('Connect timeout must be greater than zero.');
+            throw new InvalidArgumentException('Connect timeout must be greater than zero.');
         }
 
         $this->connectTimeout = $seconds;
@@ -97,7 +98,7 @@ final class SdkFactory
     public function withTimeout(float $seconds): self
     {
         if ($seconds <= 0) {
-            throw new \InvalidArgumentException('Timeout must be greater than zero.');
+            throw new InvalidArgumentException('Timeout must be greater than zero.');
         }
 
         $this->timeout = $seconds;

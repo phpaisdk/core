@@ -8,6 +8,8 @@ use AiSdk\Content;
 use AiSdk\Contracts\DecisionModelInterface;
 use AiSdk\Contracts\Model;
 use AiSdk\Decisions\Question;
+use AiSdk\Exceptions\InvalidArgumentException;
+use AiSdk\Exceptions\InvalidResponseException;
 use AiSdk\Requests\DecisionModelRequest;
 use AiSdk\Results\DecisionResult;
 use AiSdk\Support\Concerns\HasProviderOptions;
@@ -36,7 +38,7 @@ final class PendingDecisionRequest
         $names = [];
         foreach ($questions as $question) {
             if (isset($names[$question->name])) {
-                throw new \InvalidArgumentException('Decision question names must be unique.');
+                throw new InvalidArgumentException('Decision question names must be unique.');
             }
             $names[$question->name] = true;
         }
@@ -49,7 +51,7 @@ final class PendingDecisionRequest
     {
         foreach ($images as $image) {
             if ($image->type !== Content::TYPE_IMAGE || $image->fileReference() !== null) {
-                throw new \InvalidArgumentException('Decision images must be inline or URL images.');
+                throw new InvalidArgumentException('Decision images must be inline or URL images.');
             }
         }
         $this->images = array_values($images);
@@ -60,23 +62,23 @@ final class PendingDecisionRequest
     public function run(): DecisionResult
     {
         if ($this->questions === []) {
-            throw new \InvalidArgumentException('At least one decision question is required.');
+            throw new InvalidArgumentException('At least one decision question is required.');
         }
         $model = ModelResolver::resolve($this->model, DecisionModelInterface::class, 'Generate::decision()');
         $response = $model->decide(new DecisionModelRequest($this->input, $this->questions, $this->images, $this->readProviderOptions()[$model->provider()] ?? []));
         if (count($response->answers) !== count($this->questions)) {
-            throw new \UnexpectedValueException('Decision response must contain one answer per question.');
+            throw new InvalidResponseException('Decision response must contain one answer per question.');
         }
         foreach ($this->questions as $question) {
-            $answer = $response->answers[$question->name] ?? throw new \UnexpectedValueException('Decision response is missing an answer.');
+            $answer = $response->answers[$question->name] ?? throw new InvalidResponseException('Decision response is missing an answer.');
             if ($answer->kind === 'refusal') {
                 continue;
             }
             if ($answer->kind !== $question->kind) {
-                throw new \UnexpectedValueException('Decision answer has the wrong type.');
+                throw new InvalidResponseException('Decision answer has the wrong type.');
             }
             if ($question->kind === 'choice' && (! is_string($answer->value) || ! array_key_exists($answer->value, $question->choices))) {
-                throw new \UnexpectedValueException('Decision returned an unknown choice.');
+                throw new InvalidResponseException('Decision returned an unknown choice.');
             }
             if (in_array($question->kind, ['choice', 'score'], true)) {
                 $expected = $question->kind === 'choice' ? array_keys($question->choices) : array_keys($question->levels);
@@ -84,11 +86,11 @@ final class PendingDecisionRequest
                 sort($expected);
                 sort($actual);
                 if ($expected !== $actual || abs(array_sum($answer->probabilities) - 1.0) > 0.001) {
-                    throw new \UnexpectedValueException('Decision probabilities must cover all supplied options and sum to one.');
+                    throw new InvalidResponseException('Decision probabilities must cover all supplied options and sum to one.');
                 }
             }
             if ($question->kind === 'score' && (! is_float($answer->value) || $answer->value < 0 || $answer->value > count($question->levels) - 1)) {
-                throw new \UnexpectedValueException('Decision score is outside the supplied rubric.');
+                throw new InvalidResponseException('Decision score is outside the supplied rubric.');
             }
         }
 
@@ -97,7 +99,7 @@ final class PendingDecisionRequest
 
     public function decide(string $question, float $threshold = 0.5): bool
     {
-        \AiSdk\Decisions\Answer::probability($threshold);
+        \AiSdk\Decisions\Answer::assertThreshold($threshold);
 
         return (clone $this)->questions(Question::predicate('decision', $question))->run()->answer('decision')->yes($threshold);
     }
@@ -111,7 +113,7 @@ final class PendingDecisionRequest
     public function choose(string $question, array $items, callable $describe, ?float $threshold = null): mixed
     {
         if ($threshold !== null) {
-            \AiSdk\Decisions\Answer::probability($threshold);
+            \AiSdk\Decisions\Answer::assertThreshold($threshold);
         }
         $choices = [];
         foreach ($items as $key => $item) {
@@ -122,7 +124,7 @@ final class PendingDecisionRequest
             return null;
         }
         if (! is_string($answer->value)) {
-            throw new \UnexpectedValueException('Expected a choice.');
+            throw new InvalidResponseException('Expected a choice.');
         }
         if ($threshold !== null && $answer->probabilityOf($answer->value) < $threshold) {
             return null;

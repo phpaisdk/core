@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace AiSdk\Support;
 
+use AiSdk\Exceptions\ApprovalException;
 use AiSdk\Exceptions\InvalidToolInputException;
 use AiSdk\Exceptions\NoSuchToolException;
 use AiSdk\Exceptions\SchemaValidationException;
@@ -54,7 +55,7 @@ final readonly class ToolExecutor
         }
 
         if ($tool->requiresApproval() && ! $this->approved) {
-            throw new \LogicException('This tool requires approval. Use Agent to pause and resume with an explicit decision.');
+            throw new ApprovalException('This tool requires approval. Use Agent to pause and resume with an explicit decision.');
         }
 
         $context = new ToolExecutionContext(

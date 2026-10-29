@@ -5,6 +5,7 @@ declare(strict_types=1);
 use AiSdk\Agent;
 use AiSdk\Agents\AgentCheckpoint;
 use AiSdk\Agents\CheckpointStore;
+use AiSdk\Exceptions\ApprovalException;
 use AiSdk\FinishReason;
 use AiSdk\Responses\Parts\TextPart;
 use AiSdk\Responses\Parts\ToolCallPart;
@@ -45,11 +46,11 @@ it('pauses the entire batch and resumes only once with a scoped decision', funct
     $agent = new Agent($model, tools: [$tool], store: approvalStore(), signingKey: str_repeat('x', 32));
     $pause = $agent->run('send it', 'tenant:1:user:2');
     expect($executions)->toBe(0)->and($pause->approvals)->toHaveCount(1)->and($model->requests)->toHaveCount(1);
-    expect(fn() => $agent->resume($pause->resumeToken, ['call' => true], 'tenant:other'))->toThrow(InvalidArgumentException::class);
+    expect(fn() => $agent->resume($pause->resumeToken, ['call' => true], 'tenant:other'))->toThrow(ApprovalException::class);
     $done = $agent->resume($pause->resumeToken, ['call' => $approve], 'tenant:1:user:2');
     expect($done->result->text)->toBe('done')->and($executions)->toBe($approve ? 1 : 0)
         ->and($done->totalUsage->totalTokens)->toBe(12);
-    expect(fn() => $agent->resume($pause->resumeToken, ['call' => true], 'tenant:1:user:2'))->toThrow(InvalidArgumentException::class);
+    expect(fn() => $agent->resume($pause->resumeToken, ['call' => true], 'tenant:1:user:2'))->toThrow(ApprovalException::class);
 })->with([true, false]);
 
 it('enforces a shared step budget across approval resumes', function () {
@@ -68,14 +69,14 @@ it('does not execute tools when decisions are missing or the token was tampered 
     });
     $agent = new Agent($model, tools: [$tool], store: approvalStore(), signingKey: str_repeat('x', 32));
     $pause = $agent->run('hi', 'user');
-    expect(fn() => $agent->resume($pause->resumeToken . 'bad', ['call' => true], 'user'))->toThrow(InvalidArgumentException::class);
-    expect(fn() => $agent->resume($pause->resumeToken, [], 'user'))->toThrow(InvalidArgumentException::class);
+    expect(fn() => $agent->resume($pause->resumeToken . 'bad', ['call' => true], 'user'))->toThrow(ApprovalException::class);
+    expect(fn() => $agent->resume($pause->resumeToken, [], 'user'))->toThrow(ApprovalException::class);
     expect($executions)->toBe(0);
 });
 
 it('does not bypass approval in Generate tool loops', function () {
     $model = new FakeTextModel(new TextModelResponse([new ToolCallPart('call', 'send', [])], FinishReason::ToolCalls, Usage::empty()));
-    expect(fn() => \AiSdk\Generate::text('hi')->model($model)->tool(Tool::make('send')->needsApproval()->run(fn() => 'sent'))->run())->toThrow(LogicException::class);
+    expect(fn() => \AiSdk\Generate::text('hi')->model($model)->tool(Tool::make('send')->needsApproval()->run(fn() => 'sent'))->run())->toThrow(ApprovalException::class);
 });
 
 it('pauses nonrestricted siblings too until approval is resolved', function () {
@@ -123,7 +124,7 @@ it('rejects expired checkpoints without running tools', function () {
         $executions++;
     })], store: $store, signingKey: str_repeat('x', 32));
     $paused = $agent->run('hi', 'user');
-    expect(fn() => $agent->resume($paused->resumeToken, ['a' => true], 'user'))->toThrow(InvalidArgumentException::class);
+    expect(fn() => $agent->resume($paused->resumeToken, ['a' => true], 'user'))->toThrow(ApprovalException::class);
     expect($executions)->toBe(0);
 });
 
@@ -137,7 +138,7 @@ it('keeps the approval pending when a malformed decision is submitted', function
         $executions++;
     })], store: approvalStore(), signingKey: str_repeat('x', 32));
     $paused = $agent->run('hi', 'user');
-    expect(fn() => $agent->resume($paused->resumeToken, [], 'user'))->toThrow(InvalidArgumentException::class);
+    expect(fn() => $agent->resume($paused->resumeToken, [], 'user'))->toThrow(ApprovalException::class);
     $done = $agent->resume($paused->resumeToken, ['call' => true], 'user');
     expect($done->result->text)->toBe('done')->and($executions)->toBe(1);
 });

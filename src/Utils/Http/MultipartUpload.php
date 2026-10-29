@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace AiSdk\Utils\Http;
 
+use AiSdk\Exceptions\InvalidArgumentException;
 use AiSdk\Files\FileUpload;
 use AiSdk\Support\Sdk;
 use GuzzleHttp\Psr7\MultipartStream;
@@ -18,7 +19,7 @@ final class MultipartUpload
         $parts = [];
         foreach ($fields as $name => $value) {
             if ($name === 'file' || preg_match('/[\x00-\x1f\x7f"\\\\]/', $name)) {
-                throw new \InvalidArgumentException('Invalid multipart field name.');
+                throw new InvalidArgumentException('Invalid multipart field name.');
             }
             $parts[] = ['name' => $name, 'contents' => is_bool($value) ? ($value ? 'true' : 'false') : (string) $value];
         }

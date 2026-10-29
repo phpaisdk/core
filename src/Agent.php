@@ -9,6 +9,9 @@ use AiSdk\Agents\AgentResult;
 use AiSdk\Agents\CheckpointStore;
 use AiSdk\Contracts\Model;
 use AiSdk\Contracts\TextModelInterface;
+use AiSdk\Exceptions\ApprovalException;
+use AiSdk\Exceptions\InvalidArgumentException;
+use AiSdk\Exceptions\InvalidResponseException;
 use AiSdk\Requests\TextModelRequest;
 use AiSdk\Results\TextResult;
 use AiSdk\Support\Json;
@@ -32,16 +35,16 @@ final readonly class Agent
         private int $approvalTtl = 900,
     ) {
         if ($maxSteps < 1 || $approvalTtl < 1 || $id === '') {
-            throw new \InvalidArgumentException('Agent requires a positive step limit, positive approval TTL and nonempty id.');
+            throw new InvalidArgumentException('Agent requires a positive step limit, positive approval TTL and nonempty id.');
         }
         $names = [];
         foreach ($tools as $tool) {
             if ($tool->name() === '' || isset($names[$tool->name()])) {
-                throw new \InvalidArgumentException('Agent tool names must be unique and nonempty.');
+                throw new InvalidArgumentException('Agent tool names must be unique and nonempty.');
             }
             $names[$tool->name()] = true;
             if ($tool->requiresApproval() && ($store === null || $signingKey === null || strlen($signingKey) < 32)) {
-                throw new \InvalidArgumentException('Approval requires a checkpoint store and a signing key of at least 32 bytes.');
+                throw new InvalidArgumentException('Approval requires a checkpoint store and a signing key of at least 32 bytes.');
             }
         }
     }
@@ -53,12 +56,12 @@ final readonly class Agent
         $messages = is_string($prompt) ? [Message::user($prompt)] : $prompt;
         foreach ($messages as $message) {
             if (! $message instanceof Message) {
-                throw new \InvalidArgumentException('Agent messages must be Message instances.');
+                throw new InvalidArgumentException('Agent messages must be Message instances.');
             }
         }
         $messages = array_values($messages);
         if ($messages === []) {
-            throw new \InvalidArgumentException('Agent requires messages.');
+            throw new InvalidArgumentException('Agent requires messages.');
         }
 
         return $this->advance($messages, $this->maxSteps, Usage::empty(), $scope);
@@ -70,11 +73,11 @@ final readonly class Agent
     {
         [$payload, $signature] = array_pad(explode('.', $token, 2), 2, '');
         if ($this->store === null || $this->signingKey === null || ! hash_equals(hash_hmac('sha256', Json::encode([$payload, $scope, $this->id]), $this->signingKey), $signature)) {
-            throw new \InvalidArgumentException('Invalid approval token or scope.');
+            throw new ApprovalException('Invalid approval token or scope.');
         }
         $checkpoint = $this->store->consume($payload);
         if ($checkpoint === null || $checkpoint->expiresAt <= time() || $checkpoint->scope !== $scope || $checkpoint->agent !== $this->id) {
-            throw new \InvalidArgumentException('Approval checkpoint is expired, already consumed, or invalid.');
+            throw new ApprovalException('Approval checkpoint is expired, already consumed, or invalid.');
         }
         $ids = array_keys($decisions);
         $expected = $checkpoint->approvalIds;
@@ -84,7 +87,7 @@ final readonly class Agent
             // The token was authentic and unexpired, so a malformed submission must not destroy the pending approval.
             $this->store->put($payload, $checkpoint);
 
-            throw new \InvalidArgumentException('Supply one boolean decision for every approval.');
+            throw new ApprovalException('Supply one boolean decision for every approval.');
         }
         $messages = $this->execute($checkpoint->messages, $checkpoint->calls, $decisions);
 
@@ -126,14 +129,14 @@ final readonly class Agent
             $seen = [];
             foreach ($calls as $call) {
                 if ($call->id === '' || isset($seen[$call->id])) {
-                    throw new \UnexpectedValueException('Agent tool call ids must be unique and nonempty within a step.');
+                    throw new InvalidResponseException('Agent tool call ids must be unique and nonempty within a step.');
                 }
                 $seen[$call->id] = true;
             }
             $approvals = array_values(array_filter($calls, fn(ToolCall $call): bool => $this->requiresApproval($call)));
             if ($approvals !== []) {
                 if ($scope === '' || $this->store === null || $this->signingKey === null) {
-                    throw new \LogicException('A nonempty application authorization scope and checkpoint storage are required for approval.');
+                    throw new ApprovalException('A nonempty application authorization scope and checkpoint storage are required for approval.');
                 }
                 $key = bin2hex(random_bytes(32));
                 $this->store->put($key, new AgentCheckpoint($scope, $this->id, time() + $this->approvalTtl, $messages, $calls, array_map(static fn(ToolCall $call): string => $call->id, $approvals), $remaining - 1, $usage));
