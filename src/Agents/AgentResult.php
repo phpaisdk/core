@@ -22,5 +22,6 @@ final readonly class AgentResult
         public ?string $resumeToken = null,
         public bool $stepLimitReached = false,
         public ?\AiSdk\Observability\RunContext $runContext = null,
+        public ?self $pendingChild = null,
     ) {}
 }

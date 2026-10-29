@@ -11,5 +11,6 @@ final class ToolResult
         public readonly string $toolName,
         public readonly mixed $output,
         public readonly bool $isError = false,
+        public readonly ?\AiSdk\Agents\AgentResult $agentResult = null,
     ) {}
 }

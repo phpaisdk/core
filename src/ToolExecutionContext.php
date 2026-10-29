@@ -16,5 +16,7 @@ final class ToolExecutionContext
         public readonly array $arguments,
         public readonly array $messages = [],
         public readonly ?\AiSdk\Observability\RunContext $runContext = null,
+        public readonly string $scope = '',
+        public readonly ?\AiSdk\Observability\Events $events = null,
     ) {}
 }

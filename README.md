@@ -698,3 +698,21 @@ Middleware may filter or replace outgoing tools. Approval checkpoints persist on
 Approval applies to every registered `Tool`, including class-based tools and application tools that call a remote service, when `needsApproval()` is set. Provider-hosted tools run inside the provider and are outside the PHP execution loop: they cannot be approved locally. The paused `AgentResult::messages` includes the assistant message and its tool calls, so a UI can announce a call before showing `approvals`.
 
 Unknown calls in a paused batch settle immediately as error tool messages without running other handlers. If an approval tool is removed from the agent or loses its approval flag before resume, its pending call settles as an error and is never executed. Decisions for these unavailable calls may be omitted; stale decisions for their original ids are accepted and ignored. Every still-valid approval requires an explicit boolean decision. Other unexpected ids remain invalid. Registered non-approval siblings keep waiting for the batch decision.
+
+## Sub-agents as tools (0.11)
+
+`Agent::asTool(string $name, string $description, ?Schema $input = null): Tool` delegates to another bounded agent. By default its input is an object with a required string `prompt`. A supplied schema uses the normal tool validator and sends the validated value to the child as JSON. The model receives only the child's answer, never its conversations or resume token.
+
+```php
+$research = new AiSdk\Agent($researchModel, instructions: 'Find supporting facts.');
+$writer = new AiSdk\Agent($writerModel, tools: [
+    $research->asTool('research', 'Research the supplied topic'),
+]);
+$run = $writer->run('Explain the topic');
+```
+
+Children inherit the application scope and parent invocation id. Their run events also reach the parent's listeners, with distinct invocation ids. `AgentResult::totalUsage` includes descendants and completed child steps even when a later child step fails. Usage already counted before a pause is not counted again on resume. Root depth is zero; the default shared `maxDepth` permits three nested levels. Configure it with the agent constructor (0–32); a child can lower its inherited ceiling but cannot raise it. Re-entering an ancestor or exceeding the limit produces an `AgentDepthException` error tool result so the model can recover.
+
+When a child can pause, every parent needs its own checkpoint store, signing key, distinct agent id and nonempty application scope. Parent and child stores may be separate. The parent returns the child's approval calls and a **parent** resume token. Use that parent token to resume: it first resolves the child and then continues the parent. Completed siblings are not replayed; pending siblings retain their original allow/deny decisions, and each agent retains its own generation budget. Repeated child and grandchild pauses work the same way. `AgentResult::pendingChild` exposes the child result and its assistant announcement for nested approval UI; parent `messages` remains the parent's conversation. `ToolPaused` reports a tool waiting for child approval; tool timings measure each active segment, excluding human wait time.
+
+Custom checkpoint storage must preserve the optional `child` continuation and `decisions` fields as well as context, tool names and step counts. Keep checkpoints server-side. Removing a pending sub-agent settles its parent call as an error. Approval tokens remain single-use; do not independently resume a child using its nested token after returning a parent token to the application. Use the same application-owned agent configuration on resume; custom tools that delegate manually must forward `ToolExecutionContext` to retain nesting and scope guarantees.

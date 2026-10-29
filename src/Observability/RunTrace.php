@@ -12,12 +12,34 @@ use Closure;
 use Throwable;
 
 /** @internal Per-execution dispatcher; no ambient or static state. */
-final class RunTrace
+final class RunTrace implements Events
 {
     private bool $terminal = false;
 
+    private Usage $nestedUsage;
+
+
     /** @param list<Events|Closure> $listeners */
-    public function __construct(public RunContext $context, private array $listeners = []) {}
+    public function __construct(public RunContext $context, private array $listeners = [])
+    {
+        $this->nestedUsage = Usage::empty();
+    }
+
+    public function handle(RunEvent $event): void
+    {
+        if ($event instanceof Event\StepFinished && $event->run->invocationId !== $this->context->invocationId) {
+            $this->nestedUsage = $this->nestedUsage->add($event->usage);
+        }
+        $this->emit($event);
+    }
+
+    public function takeNestedUsage(): Usage
+    {
+        $usage = $this->nestedUsage;
+        $this->nestedUsage = Usage::empty();
+
+        return $usage;
+    }
 
     public function emit(RunEvent $event): void
     {

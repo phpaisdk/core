@@ -36,19 +36,24 @@ final readonly class ToolExecutor
         private bool $exposeErrors = false,
         private bool $approved = false,
         private ?\AiSdk\Observability\RunTrace $trace = null,
+        private string $scope = '',
     ) {}
 
     /**
      * @param  array<int, Message>  $messages
      */
-    public function execute(ToolCall $call, array $messages): ToolResult
+    /**
+     * @param array<int, Message> $messages
+     * @param array<string, bool> $childDecisions
+     */
+    public function execute(ToolCall $call, array $messages, ?\AiSdk\Agents\ChildCheckpoint $child = null, array $childDecisions = []): ToolResult
     {
         $start = hrtime(true);
         $this->trace?->emit(new \AiSdk\Observability\Events\ToolStarted($this->trace->context, $call->name, $call->id));
         $errorClass = null;
 
         try {
-            $result = $this->perform($call, $messages, $errorClass);
+            $result = $this->perform($call, $messages, $errorClass, $child, $childDecisions);
         } catch (Throwable $error) {
             $this->toolFailed($call, $start, $error::class);
 
@@ -56,6 +61,8 @@ final readonly class ToolExecutor
         }
         if ($result->isError) {
             $this->toolFailed($call, $start, $errorClass ?? \AiSdk\Exceptions\ToolExecutionException::class);
+        } elseif ($result->agentResult?->resumeToken !== null) {
+            $this->trace?->emit(new \AiSdk\Observability\Events\ToolPaused($this->trace->context, $call->name, $call->id, (int) ((hrtime(true) - $start) / 1000)));
         } else {
             $this->trace?->emit(new \AiSdk\Observability\Events\ToolFinished($this->trace->context, $call->name, $call->id, (int) ((hrtime(true) - $start) / 1000)));
         }
@@ -68,8 +75,9 @@ final readonly class ToolExecutor
         $this->trace?->emit(new \AiSdk\Observability\Events\ToolFailed($this->trace->context, $call->name, $call->id, (int) ((hrtime(true) - $start) / 1000), $errorClass));
     }
 
-    /** @param array<int, Message> $messages */
-    private function perform(ToolCall $call, array $messages, ?string &$errorClass): ToolResult
+    /** @param array<int, Message> $messages
+     * @param array<string, bool> $childDecisions */
+    private function perform(ToolCall $call, array $messages, ?string &$errorClass, ?\AiSdk\Agents\ChildCheckpoint $child, array $childDecisions): ToolResult
     {
         $tool = $this->find($call->name);
 
@@ -94,17 +102,34 @@ final readonly class ToolExecutor
             arguments: $call->arguments,
             messages: $messages,
             runContext: $this->trace?->context,
+            scope: $this->scope,
+            events: $this->trace,
         );
 
         try {
-            return new ToolResult($call->id, $tool->name(), $tool->call($call->arguments, $context));
+            if ($child !== null && ! $tool instanceof \AiSdk\Agents\SubAgentTool) {
+                throw new ApprovalException('The pending sub-agent tool is no longer available.');
+            }
+            $output = $child !== null && $tool instanceof \AiSdk\Agents\SubAgentTool
+                ? $tool->resumeChild($child->token, $childDecisions, $context)
+                : $tool->call($call->arguments, $context);
+            if ($output instanceof \AiSdk\Agents\AgentResult) {
+                return new ToolResult($call->id, $tool->name(), $output->result->text ?? '', agentResult: $output);
+            }
+
+            return new ToolResult($call->id, $tool->name(), $output);
         } catch (Throwable $error) {
             $errorClass = $error::class;
             if ($this->throwOnError) {
                 throw $error;
             }
 
-            return new ToolResult($call->id, $tool->name(), ['error' => $this->describe($call->name, $error)], isError: true);
+            $details = ['error' => $this->describe($call->name, $error)];
+            if ($error instanceof \AiSdk\Exceptions\AgentDepthException) {
+                $details['type'] = $error::class;
+            }
+
+            return new ToolResult($call->id, $tool->name(), $details, isError: true);
         }
     }
 
