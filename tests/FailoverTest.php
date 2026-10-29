@@ -124,6 +124,21 @@ it('skips a model that just failed while its cooldown lasts', function () {
     expect($primary->calls)->toBe(1);
 });
 
+it('starts cooling down a model whose stream failed after emitting output', function () {
+    $primary = new ThrowingTextModel(new OverloadedException('dropped'), 'primary', [new TextDeltaPart('partial')]);
+    $model = Failover::of($primary, streamingModel('other'))->cooldown(60);
+
+    $consume = function () use ($model): void {
+        foreach (Generate::text('Hi')->model($model)->stream() as $part) {
+            // consume
+        }
+    };
+    expect($consume)->toThrow(OverloadedException::class);
+    $consume();
+
+    expect($primary->calls)->toBe(1);
+});
+
 it('skips candidates that have no adapter for the requested capability', function () {
     $textOnly = new ProviderModel('textonly', 'm', function (string $contract): Model {
         throw NoSuchModelException::for('textonly', 'm', $contract);

@@ -111,6 +111,10 @@ final class FailoverRunner
                 return;
             } catch (Throwable $error) {
                 if ($started) {
+                    if ($this->cooldownSeconds > 0 && ($this->retryWhen)($error)) {
+                        $this->state->coolingUntil[$this->key($model)] = hrtime(true) / 1e9 + $this->cooldownSeconds;
+                    }
+
                     throw $error;
                 }
 
