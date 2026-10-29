@@ -4,6 +4,7 @@ Notable changes to `aisdk/core`. Release notes are also published at https://git
 
 ## Unreleased (v0.10.2)
 
+- Distinguish exhausted credits and quota with `InsufficientCreditsException` and automatically fail over to another model.
 - Structured text output accepts a surrounding Markdown JSON fence, including streamed results.
 
 ## v0.10.1 — 2026-10-29

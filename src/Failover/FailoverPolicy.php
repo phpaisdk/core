@@ -6,6 +6,7 @@ namespace AiSdk\Failover;
 
 use AiSdk\Exceptions\APIConnectionException;
 use AiSdk\Exceptions\CapabilityNotSupportedException;
+use AiSdk\Exceptions\InsufficientCreditsException;
 use AiSdk\Exceptions\InternalServerException;
 use AiSdk\Exceptions\OverloadedException;
 use AiSdk\Exceptions\ProviderException;
@@ -16,7 +17,7 @@ use Throwable;
 
 /**
  * Default rule: fail over on problems that another provider can plausibly
- * avoid, never on problems with the request or credentials themselves.
+ * avoid (including exhausted account credit), never on problems with the request or credentials themselves.
  */
 final class FailoverPolicy
 {
@@ -24,7 +25,8 @@ final class FailoverPolicy
 
     public static function isTransient(Throwable $error): bool
     {
-        if ($error instanceof RateLimitException
+        if ($error instanceof InsufficientCreditsException
+            || $error instanceof RateLimitException
             || $error instanceof OverloadedException
             || $error instanceof InternalServerException
             || $error instanceof APIConnectionException

@@ -6,6 +6,7 @@ namespace AiSdk\Utils\Errors;
 
 use AiSdk\Exceptions\AiSdkException;
 use AiSdk\Exceptions\AuthenticationException;
+use AiSdk\Exceptions\InsufficientCreditsException;
 use AiSdk\Exceptions\InternalServerException;
 use AiSdk\Exceptions\InvalidRequestException;
 use AiSdk\Exceptions\InvalidResponseException;
@@ -17,7 +18,7 @@ use AiSdk\Exceptions\RateLimitException;
 
 /**
  * Maps a provider HTTP error to a normalized SDK exception. Intentionally
- * small: status code drives the class, body provides message/context.
+ * small: status and explicit billing or authentication signals decide the class.
  */
 final class HttpErrorNormalizer
 {
@@ -40,6 +41,8 @@ final class HttpErrorNormalizer
     ): AiSdkException {
         $message = self::clean(self::extractMessage($body) ?? "{$provider} request failed with status {$status}.", self::MAX_MESSAGE_BYTES);
 
+        $insufficientCredits = $status === 402 || self::isInsufficientCredits($body, $message);
+
         $context = [
             'provider' => $provider,
             'status' => $status,
@@ -47,10 +50,11 @@ final class HttpErrorNormalizer
             'modelId' => $modelId,
             'body' => self::boundedBody($body),
             'retryAfter' => $retryAfter,
-            'retryable' => in_array($status, [408, 409, 429, 500, 502, 503, 504, 529], true),
+            'retryable' => ! $insufficientCredits && in_array($status, [408, 409, 429, 500, 502, 503, 504, 529], true),
         ];
 
         return match (true) {
+            $insufficientCredits => new InsufficientCreditsException($message, $context, $previous),
             $status === 401, self::isAuthenticationFailure($status, $body, $message) => new AuthenticationException($message, $context, $previous),
             $status === 403 => new PermissionDeniedException($message, $context, $previous),
             $status === 404 => new NotFoundException($message, $context, $previous),
@@ -100,6 +104,9 @@ final class HttpErrorNormalizer
     public static function fromStreamError(string $provider, mixed $error): AiSdkException
     {
         $body = is_array($error) ? $error : ['message' => is_string($error) ? $error : null];
+        if (is_array($body['error'] ?? null)) {
+            $body = $body['error'];
+        }
         $message = self::clean(self::extractMessage(['error' => $body]) ?? "Provider [{$provider}] returned an error in its event stream.", self::MAX_MESSAGE_BYTES);
         $kind = strtolower(implode(' ', array_filter([
             is_string($body['type'] ?? null) ? $body['type'] : null,
@@ -109,7 +116,8 @@ final class HttpErrorNormalizer
         $context = ['provider' => $provider, 'body' => self::boundedBody($body), 'errorType' => is_string($body['type'] ?? null) ? $body['type'] : null, 'errorCode' => is_string($body['code'] ?? null) ? $body['code'] : null];
 
         return match (true) {
-            str_contains($kind, 'rate_limit'), str_contains($kind, 'resource_exhausted'), str_contains($kind, 'insufficient_quota') => new RateLimitException($message, $context + ['retryable' => true]),
+            ($body['status'] ?? null) === 402, ($body['status'] ?? null) === '402', self::isInsufficientCredits($body, $message) => new InsufficientCreditsException($message, $context + ['retryable' => false]),
+            str_contains($kind, 'rate_limit'), str_contains($kind, 'resource_exhausted') => new RateLimitException($message, $context + ['retryable' => true]),
             str_contains($kind, 'overloaded'), str_contains($kind, 'unavailable') => new OverloadedException($message, $context + ['retryable' => true]),
             str_contains($kind, 'authentication'), str_contains($kind, 'invalid_api_key'), str_contains($kind, 'unauthenticated') => new AuthenticationException($message, $context),
             str_contains($kind, 'permission') => new PermissionDeniedException($message, $context),
@@ -118,6 +126,23 @@ final class HttpErrorNormalizer
             str_contains($kind, 'server_error'), str_contains($kind, 'api_error'), str_contains($kind, 'internal') => new InternalServerException($message, $context + ['retryable' => true]),
             default => new InvalidResponseException($message, $context),
         };
+    }
+
+    /**
+     * @param  array<int|string, mixed>|string|null  $body
+     */
+    private static function isInsufficientCredits(array|string|null $body, string $message): bool
+    {
+        if (is_array($body)) {
+            $error = is_array($body['error'] ?? null) ? $body['error'] : [];
+            foreach ([$error['code'] ?? null, $error['type'] ?? null, $body['code'] ?? null, $body['type'] ?? null] as $code) {
+                if (is_string($code) && in_array(strtolower($code), ['insufficient_quota', 'insufficient_credits', 'billing_hard_limit_reached'], true)) {
+                    return true;
+                }
+            }
+        }
+
+        return preg_match('/\b(?:credit balance is too low|exceeded your current quota|out of credits|payment required|insufficient credits|(?:credits?|quota) (?:exhausted|depleted)|exhausted (?:your )?(?:credits?|quota))\b/i', $message) === 1;
     }
 
     /**
