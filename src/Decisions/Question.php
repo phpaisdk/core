@@ -10,7 +10,7 @@ final readonly class Question
 {
     /**
      * @param string|list<Content> $instructions
-     * @param array<string, string> $choices
+     * @param array<array-key, string> $choices
      * @param list<string> $levels
      */
     private function __construct(
@@ -40,7 +40,7 @@ final readonly class Question
 
     /**
      * @param string|list<Content> $instructions
-     * @param array<string, string> $choices Option => description.
+     * @param array<array-key, string> $choices Option => description.
      */
     public static function choice(string $name, string|array $instructions, array $choices): self
     {
@@ -48,7 +48,8 @@ final readonly class Question
             throw new \InvalidArgumentException('Choice questions need at least two options.');
         }
         foreach ($choices as $value => $description) {
-            if (! is_string($value) || $value === '' || ! is_string($description)) {
+            // PHP stores numeric-string keys such as "42" as integers.
+            if ((string) $value === '' || ! is_string($description)) {
                 throw new \InvalidArgumentException('Choices require nonempty string keys and string descriptions.');
             }
         }

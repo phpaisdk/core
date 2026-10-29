@@ -42,3 +42,9 @@ it('validates question identity and score bounds', function () {
     $model = new FakeDecisionModel(new DecisionModelResponse(['score' => new Answer('score', 3.0, 0.5, [0 => 0.5, 1 => 0.5])]));
     expect(fn() => Generate::decision('input')->model($model)->questions(Question::score('score', 'How bad', ['Low', 'High']))->run())->toThrow(UnexpectedValueException::class);
 });
+
+
+it('selects items keyed by numeric ids', function () {
+    $model = new FakeDecisionModel(new DecisionModelResponse(['decision' => new Answer('choice', '42', 0.9, [42 => 0.9, 7 => 0.1])]));
+    expect(Generate::decision('input')->model($model)->choose('Pick', [42 => 'first', 7 => 'second'], fn($item) => $item))->toBe('first');
+});

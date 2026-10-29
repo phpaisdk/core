@@ -104,7 +104,7 @@ final class PendingDecisionRequest
 
     /**
      * @template T
-     * @param array<string, T> $items
+     * @param array<array-key, T> $items
      * @param callable(T): string $describe
      * @return T|null
      */
@@ -115,9 +115,6 @@ final class PendingDecisionRequest
         }
         $choices = [];
         foreach ($items as $key => $item) {
-            if (! is_string($key)) {
-                throw new \InvalidArgumentException('Choice items must have stable string keys.');
-            }
             $choices[$key] = $describe($item);
         }
         $answer = (clone $this)->questions(Question::choice('decision', $question, $choices))->run()->answer('decision');
