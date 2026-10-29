@@ -2,12 +2,14 @@
 
 Notable changes to `aisdk/core`. Release notes are also published at https://github.com/phpaisdk/core/releases.
 
-## Unreleased (v0.10.2)
+## v0.10.2 — 2026-10-29
 
 - Download provider media with `RemoteFetch::bytes()`, bounded size and redirects, and per-hop checks blocking private networks by default.
 - Failover retries the same model once for short `Retry-After` delays (up to 5 seconds); configure or disable with `retryAfterUpTo()`.
 - Distinguish exhausted credits and quota with `InsufficientCreditsException` and automatically fail over to another model.
 - Structured text output accepts a surrounding Markdown JSON fence, including streamed results.
+- Stored file ids that could change the request route (`/`, `\`, `?`, `#`, `%`, whitespace) are rejected before any request.
+- Provider errors wrapped in a one-element list (Google) are read correctly, so a bad API key is an `AuthenticationException`.
 
 ## v0.10.1 — 2026-10-29
 
