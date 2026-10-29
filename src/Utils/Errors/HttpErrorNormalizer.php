@@ -39,6 +39,11 @@ final class HttpErrorNormalizer
         ?\Throwable $previous = null,
         ?int $retryAfter = null,
     ): AiSdkException {
+        // Some APIs (Google) wrap their error object in a one-element list.
+        if (is_array($body) && array_is_list($body) && count($body) === 1 && is_array($body[0])) {
+            $body = $body[0];
+        }
+
         $message = self::clean(self::extractMessage($body) ?? "{$provider} request failed with status {$status}.", self::MAX_MESSAGE_BYTES);
 
         $insufficientCredits = $status === 402 || self::isInsufficientCredits($body, $message);

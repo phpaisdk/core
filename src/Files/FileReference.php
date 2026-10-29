@@ -11,8 +11,10 @@ final readonly class FileReference
 {
     public function __construct(public string $provider, public string $id)
     {
-        if ($provider === '' || $id === '' || in_array($id, ['.', '..'], true) || preg_match('/[\x00-\x1f\x7f]/', $id)) {
-            throw new InvalidArgumentException('A stored file requires a provider and a nonempty, control-free id.');
+        // An id becomes one URL path segment. Separators, query/fragment characters and escapes could make a server
+        // resolve a different route (OpenAI redirected `..%2Fmodels` to /v1/models), so they are never accepted.
+        if ($provider === '' || $id === '' || strlen($id) > 512 || in_array($id, ['.', '..'], true) || preg_match('/[\x00-\x20\x7f\/\\\\?#%]/', $id)) {
+            throw new InvalidArgumentException('A stored file requires a provider and a nonempty id without whitespace, control characters or any of / \\ ? # %.');
         }
     }
 

@@ -229,3 +229,17 @@ it('raises a typed approval exception for tokens that cannot be resumed', functi
 
     expect(fn() => $agent->resume('garbage', [], 'user'))->toThrow(AiSdk\Exceptions\ApprovalException::class);
 });
+
+it('reads Google-style errors that arrive wrapped in a one-element list', function () {
+    $error = HttpErrorNormalizer::normalize('google', 400, [['error' => ['code' => 400, 'message' => 'API key not valid. Please pass a valid API key.', 'status' => 'INVALID_ARGUMENT', 'details' => [['reason' => 'API_KEY_INVALID']]]]]);
+
+    expect($error)->toBeInstanceOf(AuthenticationException::class)->and($error->getMessage())->toContain('API key not valid');
+});
+
+it('rejects stored file ids that could change the request route', function (string $id) {
+    expect(fn() => new AiSdk\Files\FileReference('openai', $id))->toThrow(AiSdk\Exceptions\InvalidArgumentException::class);
+})->with(['../models', 'a/b', 'a\\b', 'a?x=1', 'a#frag', 'a%2Fb', 'a b', '..', '', str_repeat('x', 513)]);
+
+it('accepts the id shapes real providers use', function (string $id) {
+    expect((new AiSdk\Files\FileReference('p', $id))->id)->toBe($id);
+})->with(['file-abc123', 'file_011CNha8iCJcU1wXNR6q4V8w', 'f.1:2~3=4+5']);
