@@ -2,6 +2,17 @@
 
 Notable changes to `aisdk/core`. Release notes are also published at https://github.com/phpaisdk/core/releases.
 
+## Unreleased (v0.10.1)
+
+- Error messages from providers are redacted for echoed credentials and capped in length; odd error bodies no longer raise PHP warnings.
+- A bad API key reported as HTTP 400 (xAI, Google) is now an `AuthenticationException`; `Retry-After` HTTP dates are understood.
+- Streams that return JSON or HTML, end without content, drop mid-body, or send an oversized event now fail with typed exceptions; a stream cut off before its finish event reports `FinishReason::Unknown`.
+- In-stream errors map to `RateLimitException`, `OverloadedException` and friends via `HttpErrorNormalizer::fromStreamError()`.
+- HTTP clients that throw non-PSR exceptions are wrapped in `APIConnectionException`.
+- New `ApprovalException`; agent approval, decision and configuration errors are SDK exceptions instead of native PHP ones. A malformed approval submission keeps the approval pending.
+- `maxTokens`, `temperature`, `topP` and blank prompts are validated before any request; `files()` on a provider without file storage throws `CapabilityNotSupportedException`.
+- Credential redaction covers suffix-style parameters and AWS and GitHub token shapes.
+
 ## v0.10.0 — 2026-10-29
 
 ### Agents
