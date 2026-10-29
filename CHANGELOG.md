@@ -2,6 +2,14 @@
 
 Notable changes to `aisdk/core`. Release notes are also published at https://github.com/phpaisdk/core/releases.
 
+## Unreleased (v0.11.0)
+
+- Delegate work with `Agent::asTool()`, shared bounded nesting, cycle detection, child run events, cumulative usage, and approval tokens that resume the child before continuing its parent.
+- Inspect assistant tool-call announcements while approvals are pending; unknown calls settle as errors, and removed or no-longer-approvable tools cannot block or execute during resume. Approval applies equally to `Tool` subclasses.
+- Wrap each agent generation step with immutable request middleware, validated short-circuits, `Stop` predicates, and resumable `StepBudget` limits.
+- Observe agent and text tool-loop runs with a shared invocation id, step and tool events, timings, safe failures, and approval-resume continuity. Register isolated listeners with `onEvent()` and test with `RecordingEvents`.
+- Observe successes and failures for image, speech, transcription, embedding, decision, and video model operations with `observe()`.
+
 ## v0.10.2 — 2026-10-29
 
 - Download provider media with `RemoteFetch::bytes()`, bounded size and redirects, and per-hop checks blocking private networks by default.
@@ -11,16 +19,6 @@ Notable changes to `aisdk/core`. Release notes are also published at https://git
 - Stored file ids that could change the request route (`/`, `\`, `?`, `#`, `%`, whitespace) are rejected before any request.
 - Provider errors wrapped in a one-element list (Google) are read correctly, so a bad API key is an `AuthenticationException`.
 
-## Unreleased (v0.11.0)
-
-- Delegate work with `Agent::asTool()`, shared bounded nesting, cycle detection, child run events, cumulative usage, and approval tokens that resume the child before continuing its parent.
-
-- Inspect assistant tool-call announcements while approvals are pending; unknown calls settle as errors, and removed or no-longer-approvable tools cannot block or execute during resume. Approval applies equally to `Tool` subclasses.
-
-- Wrap each agent generation step with immutable request middleware, validated short-circuits, `Stop` predicates, and resumable `StepBudget` limits.
-
-- Observe agent and text tool-loop runs with a shared invocation id, step and tool events, timings, safe failures, and approval-resume continuity. Register isolated listeners with `onEvent()` and test with `RecordingEvents`.
-- Observe successes and failures for image, speech, transcription, embedding, decision, and video model operations with `observe()`.
 
 ## v0.10.1 — 2026-10-29
 
