@@ -9,6 +9,15 @@ use AiSdk\CapabilitySupport;
 
 final class CapabilityNotSupportedException extends AiSdkException
 {
+    /** A provider-level feature (files, webhooks, ...) the provider package does not implement. */
+    public static function forProvider(string $provider, string $feature): self
+    {
+        return new self(
+            message: "Provider [{$provider}] does not support {$feature}.",
+            context: ['provider' => $provider, 'feature' => $feature],
+        );
+    }
+
     public static function for(string $provider, string $modelId, Capability $capability): self
     {
         return new self(

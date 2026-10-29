@@ -201,3 +201,31 @@ it('treats providers that answer a bad API key with 400 as authentication failur
 it('does not mistake ordinary bad requests for authentication failures', function () {
     expect(HttpErrorNormalizer::normalize('p', 400, ['error' => ['message' => 'max_tokens must be positive']]))->toBeInstanceOf(AiSdk\Exceptions\InvalidRequestException::class);
 });
+
+it('rejects nonsensical generation settings and blank prompts before any request', function (Closure $call) {
+    expect($call)->toThrow(AiSdk\Exceptions\InvalidArgumentException::class);
+})->with([
+    'zero maxTokens' => [fn() => AiSdk\Generate::text('hi')->maxTokens(0)],
+    'negative temperature' => [fn() => AiSdk\Generate::text('hi')->temperature(-0.5)],
+    'NaN temperature' => [fn() => AiSdk\Generate::text('hi')->temperature(NAN)],
+    'topP above one' => [fn() => AiSdk\Generate::text('hi')->topP(1.5)],
+    'empty prompt' => [fn() => AiSdk\Generate::text('')->model(AiSdk\Testing\Fakes\FakeTextModel::text('ok'))->run()],
+    'whitespace prompt' => [fn() => AiSdk\Generate::text("  \n ")->model(AiSdk\Testing\Fakes\FakeTextModel::text('ok'))->run()],
+]);
+
+it('reports a provider without file storage as an unsupported capability', function () {
+    $provider = new class extends AiSdk\Contracts\BaseProvider {
+        public function name(): string
+        {
+            return 'plain';
+        }
+    };
+
+    expect(fn() => $provider->files())->toThrow(AiSdk\Exceptions\CapabilityNotSupportedException::class, 'file storage');
+});
+
+it('raises a typed approval exception for tokens that cannot be resumed', function () {
+    $agent = new AiSdk\Agent(AiSdk\Testing\Fakes\FakeTextModel::text('ok'));
+
+    expect(fn() => $agent->resume('garbage', [], 'user'))->toThrow(AiSdk\Exceptions\ApprovalException::class);
+});

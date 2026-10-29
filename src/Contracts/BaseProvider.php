@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace AiSdk\Contracts;
 
+use AiSdk\Exceptions\CapabilityNotSupportedException;
 use AiSdk\Exceptions\NoSuchModelException;
 use AiSdk\Live\Contracts\LiveModelInterface;
 use AiSdk\ProviderModel;
@@ -39,6 +40,14 @@ abstract class BaseProvider implements ProviderInterface
             LiveModelInterface::class => $this->liveModel($modelId),
             default => throw NoSuchModelException::for($this->name(), $modelId, $contract),
         };
+    }
+
+    /**
+     * Provider-account file storage. Providers that offer it override this method.
+     */
+    public function files(): FileStoreInterface
+    {
+        throw CapabilityNotSupportedException::forProvider($this->name(), 'file storage');
     }
 
     protected function decisionModel(string $modelId): DecisionModelInterface

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace AiSdk\Support;
 
+use AiSdk\Content;
 use AiSdk\Contracts\Model;
 use AiSdk\Contracts\TextModelInterface;
 use AiSdk\Exceptions\InvalidArgumentException;
@@ -228,9 +229,31 @@ final class PendingTextRequest
         );
     }
 
+    /**
+     * True when no message carries any text, attachment or tool call, so the provider would only reject it.
+     *
+     * @param  array<int, Message>  $messages
+     */
+    private function isBlank(array $messages): bool
+    {
+        foreach ($messages as $message) {
+            if ($message->toolCalls !== [] || $message->toolCallId !== null) {
+                return false;
+            }
+
+            foreach ($message->content as $content) {
+                if ($content->type !== Content::TYPE_TEXT || trim((string) $content->textValue()) !== '') {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
     private function request(): TextModelRequest
     {
-        if ($this->messages === []) {
+        if ($this->messages === [] || $this->isBlank($this->messages)) {
             throw new InvalidArgumentException('Generate::text() requires a prompt or messages.');
         }
 
