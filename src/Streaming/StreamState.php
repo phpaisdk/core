@@ -40,8 +40,26 @@ final class StreamState
     /** @var array<string, mixed> */
     private array $providerMetadata = [];
 
+    private int $partCount = 0;
+
+    private bool $finished = false;
+
+    /** Number of parts recorded, including provider metadata. */
+    public function partCount(): int
+    {
+        return $this->partCount;
+    }
+
+    /** Whether the provider reported how the response ended. */
+    public function hasFinished(): bool
+    {
+        return $this->finished;
+    }
+
     public function record(StreamPart $part): void
     {
+        $this->partCount++;
+
         match (true) {
             $part instanceof TextDeltaPart => $this->text .= $part->text,
             $part instanceof ReasoningDeltaPart => $this->reasoning .= $part->text,
@@ -70,7 +88,8 @@ final class StreamState
 
     public function finishReason(): FinishReason
     {
-        return $this->finishReason ?? FinishReason::Stop;
+        // A stream that ends without a finish event may have been cut off, so do not claim it stopped normally.
+        return $this->finishReason ?? ($this->partCount > 0 ? FinishReason::Unknown : FinishReason::Stop);
     }
 
     /**
@@ -140,6 +159,7 @@ final class StreamState
 
     private function finish(FinishPart $part): void
     {
+        $this->finished = true;
         $this->response = $part->response;
         $this->finishReason = $part->reason;
         $this->usage = $part->usage;

@@ -8,6 +8,7 @@ use AiSdk\Exceptions\AiSdkException;
 use AiSdk\Exceptions\AuthenticationException;
 use AiSdk\Exceptions\InternalServerException;
 use AiSdk\Exceptions\InvalidRequestException;
+use AiSdk\Exceptions\InvalidResponseException;
 use AiSdk\Exceptions\NotFoundException;
 use AiSdk\Exceptions\OverloadedException;
 use AiSdk\Exceptions\PermissionDeniedException;
@@ -20,6 +21,11 @@ use AiSdk\Exceptions\RateLimitException;
  */
 final class HttpErrorNormalizer
 {
+    /** Provider error bodies can be whole HTML pages; keep exception messages readable. */
+    private const int MAX_MESSAGE_BYTES = 1000;
+
+    private const int MAX_BODY_BYTES = 8192;
+
     /**
      * @param  array<int|string, mixed>|string|null  $body
      */
@@ -32,14 +38,14 @@ final class HttpErrorNormalizer
         ?\Throwable $previous = null,
         ?int $retryAfter = null,
     ): AiSdkException {
-        $message = self::extractMessage($body) ?? "{$provider} request failed with status {$status}.";
+        $message = self::clean(self::extractMessage($body) ?? "{$provider} request failed with status {$status}.", self::MAX_MESSAGE_BYTES);
 
         $context = [
             'provider' => $provider,
             'status' => $status,
             'requestId' => $requestId,
             'modelId' => $modelId,
-            'body' => $body,
+            'body' => self::boundedBody($body),
             'retryAfter' => $retryAfter,
             'retryable' => in_array($status, [408, 409, 429, 500, 502, 503, 504, 529], true),
         ];
@@ -57,16 +63,91 @@ final class HttpErrorNormalizer
     }
 
     /**
+     * Normalize an error delivered inside a successful event stream (HTTP 200), where no status code exists.
+     * The provider's own error type or code decides the class so retry and failover logic can act on it.
+     */
+    public static function fromStreamError(string $provider, mixed $error): AiSdkException
+    {
+        $body = is_array($error) ? $error : ['message' => is_string($error) ? $error : null];
+        $message = self::clean(self::extractMessage(['error' => $body]) ?? "Provider [{$provider}] returned an error in its event stream.", self::MAX_MESSAGE_BYTES);
+        $kind = strtolower(implode(' ', array_filter([
+            is_string($body['type'] ?? null) ? $body['type'] : null,
+            is_string($body['code'] ?? null) ? $body['code'] : null,
+            is_string($body['status'] ?? null) ? $body['status'] : null,
+        ])));
+        $context = ['provider' => $provider, 'body' => self::boundedBody($body), 'errorType' => is_string($body['type'] ?? null) ? $body['type'] : null, 'errorCode' => is_string($body['code'] ?? null) ? $body['code'] : null];
+
+        return match (true) {
+            str_contains($kind, 'rate_limit'), str_contains($kind, 'resource_exhausted'), str_contains($kind, 'insufficient_quota') => new RateLimitException($message, $context + ['retryable' => true]),
+            str_contains($kind, 'overloaded'), str_contains($kind, 'unavailable') => new OverloadedException($message, $context + ['retryable' => true]),
+            str_contains($kind, 'authentication'), str_contains($kind, 'invalid_api_key'), str_contains($kind, 'unauthenticated') => new AuthenticationException($message, $context),
+            str_contains($kind, 'permission') => new PermissionDeniedException($message, $context),
+            str_contains($kind, 'not_found') => new NotFoundException($message, $context),
+            str_contains($kind, 'invalid_request'), str_contains($kind, 'bad_request'), str_contains($kind, 'context_length'), str_contains($kind, 'invalid_argument') => new InvalidRequestException($message, $context),
+            str_contains($kind, 'server_error'), str_contains($kind, 'api_error'), str_contains($kind, 'internal') => new InternalServerException($message, $context + ['retryable' => true]),
+            default => new InvalidResponseException($message, $context),
+        };
+    }
+
+    /**
      * @param  array<int|string, mixed>|string|null  $body
      */
     private static function extractMessage(array|string|null $body): ?string
     {
+        if (is_string($body)) {
+            return trim($body) !== '' ? $body : null;
+        }
+
+        if (! is_array($body)) {
+            return null;
+        }
+
+        $error = $body['error'] ?? null;
+
         return match (true) {
-            is_string($body) => $body !== '' ? $body : null,
-            is_array($body) && isset($body['error']) && is_array($body['error']) && isset($body['error']['message']) => (string) $body['error']['message'],
-            is_array($body) && isset($body['error']) && is_string($body['error']) => $body['error'],
-            is_array($body) && isset($body['message']) && is_string($body['message']) => $body['message'],
+            is_array($error) && array_key_exists('message', $error) => self::text($error['message']),
+            is_string($error) && $error !== '' => $error,
+            is_array($error) && $error !== [] => self::text($error),
+            default => self::text($body['message'] ?? null),
+        };
+    }
+
+    /** Only scalar or structured values become text; never rely on implicit array-to-string conversion. */
+    private static function text(mixed $value): ?string
+    {
+        return match (true) {
+            is_string($value) => $value !== '' ? $value : null,
+            is_int($value), is_float($value) => (string) $value,
+            is_array($value) && $value !== [] => json_encode($value, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PARTIAL_OUTPUT_ON_ERROR) ?: null,
             default => null,
         };
+    }
+
+    /** Remove credentials the provider may echo back, strip markup noise and cap the length. */
+    private static function clean(string $message, int $limit): string
+    {
+        $message = Redactor::text(trim(preg_replace('/\s+/', ' ', strip_tags($message)) ?? $message));
+
+        return strlen($message) > $limit ? mb_strcut($message, 0, $limit) . '…' : $message;
+    }
+
+    /**
+     * @param  array<int|string, mixed>|string|null  $body
+     * @return array<int|string, mixed>|string|null
+     */
+    private static function boundedBody(array|string|null $body): array|string|null
+    {
+        if ($body === null) {
+            return null;
+        }
+
+        $text = is_string($body) ? $body : (json_encode($body, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PARTIAL_OUTPUT_ON_ERROR) ?: '');
+        $redacted = Redactor::text($text);
+
+        if (strlen($redacted) <= self::MAX_BODY_BYTES) {
+            return is_string($body) ? $redacted : (json_decode($redacted, true) ?? $redacted);
+        }
+
+        return mb_strcut($redacted, 0, self::MAX_BODY_BYTES) . '… [truncated]';
     }
 }

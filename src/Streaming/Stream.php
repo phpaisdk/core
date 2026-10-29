@@ -138,6 +138,10 @@ final class Stream implements IteratorAggregate
                 yield $part;
             }
 
+            if ($this->state->partCount() === 0) {
+                throw new \AiSdk\Exceptions\InvalidResponseException('The model stream ended without sending any content.');
+            }
+
             $this->finalResult = is_callable($this->resultFactory)
                 ? ($this->resultFactory)($this->state)
                 : $this->accumulatedResult(false);

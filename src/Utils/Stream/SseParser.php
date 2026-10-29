@@ -16,7 +16,7 @@ final class SseParser
     /**
      * @return Generator<int, array{event: ?string, data: string}>
      */
-    public static function parseStream(StreamInterface $stream): Generator
+    public static function parseStream(StreamInterface $stream, int $maxFrameBytes = 16_777_216): Generator
     {
         $buffer = '';
 
@@ -27,6 +27,10 @@ final class SseParser
             }
 
             $buffer .= $chunk;
+
+            if (strlen($buffer) > $maxFrameBytes && self::frameBoundary($buffer) === null) {
+                throw new \AiSdk\Exceptions\InvalidResponseException('The event stream sent a single event larger than ' . $maxFrameBytes . ' bytes.');
+            }
 
             while (($pos = self::frameBoundary($buffer)) !== null) {
                 [$rawFrame, $length] = $pos;

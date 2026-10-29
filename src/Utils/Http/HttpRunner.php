@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace AiSdk\Utils\Http;
 
+use AiSdk\Exceptions\AiSdkException;
 use AiSdk\Exceptions\APIConnectionException;
+use AiSdk\Exceptions\InvalidResponseException;
 use AiSdk\Support\Json;
 use AiSdk\Support\Sdk;
 use AiSdk\Utils\Errors\HttpErrorNormalizer;
@@ -109,8 +111,20 @@ final class HttpRunner
         $headers = array_replace(['Accept' => 'text/event-stream'], $headers);
         $response = $this->send($this->prepareJson('POST', $url, $body, $headers), stream: true);
         $this->ensureSuccess($response, $provider);
+        $this->ensureEventStream($response, $provider);
 
-        yield from SseParser::parseStream($response->getBody());
+        try {
+            yield from SseParser::parseStream($response->getBody());
+        } catch (AiSdkException $e) {
+            throw $e;
+        } catch (\Exception $e) {
+            // The connection broke while the body was being read (reset, timeout, closed early).
+            throw new APIConnectionException(
+                message: 'The connection was interrupted while streaming the response: ' . Redactor::text($e->getMessage()),
+                context: ['provider' => $provider],
+                previous: $e,
+            );
+        }
     }
 
     /**
@@ -150,7 +164,65 @@ final class HttpRunner
                 context: ['url' => Redactor::url((string) $request->getUri())],
                 previous: $e,
             );
+        } catch (\Throwable $e) {
+            // A decorating client (for example one with retries) may already have produced a normalized error.
+            // PSR-18 requires clients to throw ClientExceptionInterface; some do not. Errors (TypeError and
+            // friends) are programmer mistakes and still propagate.
+            if ($e instanceof AiSdkException || $e instanceof \Error) {
+                throw $e;
+            }
+
+            throw new APIConnectionException(
+                message: 'HTTP client failure (' . $e::class . '): ' . Redactor::text($e->getMessage()),
+                context: ['url' => Redactor::url((string) $request->getUri())],
+                previous: $e,
+            );
         }
+    }
+
+    /**
+     * A streaming endpoint that answers 200 with a JSON document or an HTML page (a gateway error, a login
+     * wall, a misrouted request) would otherwise parse as an empty stream and look like a blank answer.
+     */
+    private function ensureEventStream(ResponseInterface $response, string $provider): void
+    {
+        $type = strtolower($response->getHeaderLine('content-type'));
+
+        if (! str_contains($type, 'application/json') && ! str_contains($type, 'text/html')) {
+            return;
+        }
+
+        $body = $response->getBody();
+        $text = '';
+        while (! $body->eof() && strlen($text) < 65536) {
+            $text .= $body->read(8192);
+        }
+
+        $decoded = json_decode($text, true);
+
+        throw HttpErrorNormalizer::normalize(
+            provider: $provider,
+            status: 502,
+            body: is_array($decoded) ? $decoded : $text,
+            requestId: $response->getHeaderLine('x-request-id') ?: null,
+            previous: InvalidResponseException::forProvider($provider, "Expected an event stream but received {$type}."),
+        );
+    }
+
+    /** Retry-After is either delay-seconds or an HTTP-date. */
+    private static function retryAfterSeconds(string $value): ?int
+    {
+        if ($value === '') {
+            return null;
+        }
+
+        if (is_numeric($value)) {
+            return max(0, (int) $value);
+        }
+
+        $at = strtotime($value);
+
+        return $at === false ? null : max(0, $at - time());
     }
 
     private function ensureSuccess(ResponseInterface $response, string $provider): void
@@ -167,14 +239,14 @@ final class HttpRunner
             ?: $response->getHeaderLine('anthropic-request-id')
             ?: null;
 
-        $retryAfter = $response->getHeaderLine('retry-after');
+        $retryAfter = self::retryAfterSeconds($response->getHeaderLine('retry-after'));
 
         throw HttpErrorNormalizer::normalize(
             provider: $provider,
             status: $response->getStatusCode(),
             body: is_array($decoded) ? $decoded : $body,
             requestId: $requestId,
-            retryAfter: is_numeric($retryAfter) ? (int) $retryAfter : null,
+            retryAfter: $retryAfter,
         );
     }
 }
