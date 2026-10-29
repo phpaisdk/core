@@ -19,10 +19,23 @@ final class RunTrace implements Events
     private Usage $nestedUsage;
 
 
-    /** @param list<Events|Closure> $listeners */
-    public function __construct(public RunContext $context, private array $listeners = [])
+    /** @param list<Events|Closure> $listeners
+     * @param Closure(RunEvent|\AiSdk\Streaming\StreamPart): void|null $streamOutput */
+    public function __construct(public RunContext $context, private array $listeners = [], private ?Closure $streamOutput = null)
     {
         $this->nestedUsage = Usage::empty();
+    }
+
+    public function isStreaming(): bool
+    {
+        return $this->streamOutput !== null;
+    }
+
+    public function part(\AiSdk\Streaming\StreamPart $part): void
+    {
+        if ($this->streamOutput !== null) {
+            ($this->streamOutput)($part);
+        }
     }
 
     public function handle(RunEvent $event): void
@@ -53,6 +66,9 @@ final class RunTrace implements Events
             } catch (Throwable) {
                 // Observers cannot invalidate or retry work, nor prevent other listeners running.
             }
+        }
+        if ($this->streamOutput !== null) {
+            ($this->streamOutput)($event);
         }
     }
 

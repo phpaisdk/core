@@ -4,6 +4,8 @@ Notable changes to `aisdk/core`. Release notes are also published at https://git
 
 ## Unreleased (v0.11.0)
 
+- Stream agents with typed provider parts and run events, the same middleware and tool loop as `run()`, and approval pause/resume via `resumeStream()`.
+
 - Override or add agent tools by name with immutable `withTools()` clones, and remove tools with `without()`.
 
 - Delegate work with `Agent::asTool()`, shared bounded nesting, cycle detection, child run events, cumulative usage, and approval tokens that resume the child before continuing its parent.

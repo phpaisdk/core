@@ -718,3 +718,23 @@ When a child can pause, every parent needs its own checkpoint store, signing key
 Custom checkpoint storage must preserve the optional `child` continuation and `decisions` fields as well as context, tool names and step counts. Keep checkpoints server-side. Removing a pending sub-agent settles its parent call as an error. Approval tokens remain single-use; do not independently resume a child using its nested token after returning a parent token to the application. Use the same application-owned agent configuration on resume; custom tools that delegate manually must forward `ToolExecutionContext` to retain nesting and scope guarantees.
 
 Use `$agent->withTools($replacement, $additional)` to replace configured tools by name or append new names, and `$agent->without('tool_name')` to remove them. Both return new agents preserving middleware, listeners, nesting identity, signing configuration and budgets. Duplicate names within one override and empty names are rejected. Adding an approval-capable tool still requires checkpoint configuration. Tool objects follow the existing mutable `Tool` API; clones copy the tool list, not application-owned handler objects.
+
+## Streaming agents (0.11)
+
+`Agent::stream(string|array $prompt, string $scope = ''): AgentStream` drives the same private step loop as `run()`, using the model's typed streaming operation. Iteration yields `Streaming\StreamPart` values interleaved with `Observability\RunEvent` values. Middleware short-circuits also emit typed response parts. Model errors throw; they do not silently finish the stream.
+
+```php
+$stream = $agent->stream('Research the order', scope: 'user:42');
+foreach ($stream as $part) {
+    // Handle typed provider parts and run lifecycle events.
+}
+$run = $stream->result();
+if ($run->resumeToken !== null) {
+    $continued = $agent->resumeStream($run->resumeToken, $decisions, 'user:42');
+    $run = $continued->run();
+}
+```
+
+`AgentStream::chunks()` yields text deltas, `run()` drains remaining work and returns the final `AgentResult`, `result()` requires completion, and `isComplete()` includes approval pauses as completed stream segments. There is one active consumer; stopping iteration and later draining continues without replaying chunks or tools. Completed iteration is not replayed and no event history is buffered. A stream performs no work until consumed. Discarding a partially consumed stream leaves its work unfinished.
+
+Approval streams use the same scoped, expiring, single-use checkpoints. Resume may use `resume()` or `resumeStream()` regardless of how the pause was produced. Child run events are forwarded through a streaming parent; child model generation currently remains synchronous. Each streamed step is capped at 65,536 provider parts and 16 MiB of text, reasoning and tool argument deltas. The synchronous response's 4096-part validation and existing agent step/nesting budgets also apply.

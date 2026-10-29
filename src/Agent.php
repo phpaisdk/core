@@ -137,7 +137,20 @@ final readonly class Agent
     }
 
     /** @param string|list<Message> $prompt */
-    private function startRun(string|array $prompt, string $scope, ?RunContext $parent = null): AgentResult
+    public function stream(string|array $prompt, string $scope = ''): \AiSdk\Agents\AgentStream
+    {
+        return new \AiSdk\Agents\AgentStream(fn(Closure $output): AgentResult => $this->startRun($prompt, $scope, streamOutput: $output));
+    }
+
+    /** @param array<string, bool> $decisions */
+    public function resumeStream(string $token, array $decisions, string $scope): \AiSdk\Agents\AgentStream
+    {
+        return new \AiSdk\Agents\AgentStream(fn(Closure $output): AgentResult => $this->resumeRun($token, $decisions, $scope, $output));
+    }
+
+    /** @param string|list<Message> $prompt
+     * @param Closure(RunEvent|\AiSdk\Streaming\StreamPart): void|null $streamOutput */
+    private function startRun(string|array $prompt, string $scope, ?RunContext $parent = null, ?Closure $streamOutput = null): AgentResult
     {
         $messages = is_string($prompt) ? [Message::user($prompt)] : $prompt;
         foreach ($messages as $message) {
@@ -150,7 +163,7 @@ final readonly class Agent
             throw new InvalidArgumentException('Agent requires messages.');
         }
 
-        $trace = new RunTrace(RunContext::start($parent, $this->identity, $this->maxDepth), $this->listeners);
+        $trace = new RunTrace(RunContext::start($parent, $this->identity, $this->maxDepth), $this->listeners, $streamOutput);
         $trace->start();
 
         try {
@@ -165,6 +178,13 @@ final readonly class Agent
     /**
      * @param array<string, bool> $decisions Tool call id => allow/deny. Every requested approval is required. */
     public function resume(string $token, array $decisions, string $scope): AgentResult
+    {
+        return $this->resumeRun($token, $decisions, $scope);
+    }
+
+    /** @param array<string, bool> $decisions
+     * @param Closure(RunEvent|\AiSdk\Streaming\StreamPart): void|null $streamOutput */
+    private function resumeRun(string $token, array $decisions, string $scope, ?Closure $streamOutput = null): AgentResult
     {
         [$payload, $signature] = array_pad(explode('.', $token, 2), 2, '');
         if ($this->store === null || $this->signingKey === null || ! hash_equals(hash_hmac('sha256', Json::encode([$payload, $scope, $this->id]), $this->signingKey), $signature)) {
@@ -197,7 +217,7 @@ final readonly class Agent
 
             throw new ApprovalException('Supply one boolean decision for every approval.');
         }
-        $trace = new RunTrace($checkpoint->runContext ?? RunContext::start(agentIdentity: $this->identity, maxDepth: $this->maxDepth), $this->listeners);
+        $trace = new RunTrace($checkpoint->runContext ?? RunContext::start(agentIdentity: $this->identity, maxDepth: $this->maxDepth), $this->listeners, $streamOutput);
 
         try {
             $batch = $this->execute(
@@ -249,12 +269,20 @@ final readonly class Agent
         $result = null;
         for (; $remaining > 0; $remaining--) {
             $trace->stepStarted(++$completedSteps);
+            $generated = false;
             $outcome = \AiSdk\Agents\StepPipeline::run(
                 new \AiSdk\Agents\StepContext(new TextModelRequest($messages, system: $this->instructions, tools: $this->tools), $trace->context, $completedSteps, $usage),
                 $this->middleware,
-                static fn(\AiSdk\Agents\StepContext $step): \AiSdk\Agents\StepOutcome => new \AiSdk\Agents\StepOutcome($model->generate($step->request), request: $step->request),
+                function (\AiSdk\Agents\StepContext $step) use ($model, $trace, &$generated): \AiSdk\Agents\StepOutcome {
+                    $generated = true;
+
+                    return $this->generateStep($model, $step, $trace);
+                },
             );
             $response = $outcome->response;
+            if (! $generated && $trace->isStreaming()) {
+                $this->streamOutcome($response, $trace);
+            }
             $stepTools = array_values($outcome->request->tools ?? $this->tools);
             $messages = array_values($outcome->request->messages ?? $messages);
             $usage = $usage->add($response->usage);
@@ -302,6 +330,62 @@ final readonly class Agent
         }
 
         return new AgentResult($result, $messages, $usage, stepLimitReached: true, runContext: $trace->finish($usage));
+    }
+
+    private function streamOutcome(\AiSdk\Responses\TextModelResponse $response, RunTrace $trace): void
+    {
+        $index = 0;
+        $bytes = 0;
+        foreach ($response->parts as $part) {
+            if ($part instanceof \AiSdk\Responses\Parts\TextPart || $part instanceof \AiSdk\Responses\Parts\ReasoningPart) {
+                $bytes += strlen($part->text);
+                if ($bytes > 16 * 1024 * 1024) {
+                    throw new InvalidResponseException('An agent stream step exceeded its size limit.');
+                }
+                $trace->part($part instanceof \AiSdk\Responses\Parts\TextPart ? new \AiSdk\Streaming\TextDeltaPart($part->text) : new \AiSdk\Streaming\ReasoningDeltaPart($part->text));
+            } elseif ($part instanceof \AiSdk\Responses\Parts\ToolCallPart) {
+                $arguments = Json::encode($part->arguments);
+                $bytes += strlen($arguments);
+                if ($bytes > 16 * 1024 * 1024) {
+                    throw new InvalidResponseException('An agent stream step exceeded its size limit.');
+                }
+                $trace->part(new \AiSdk\Streaming\ToolCallStartPart($index, $part->id, $part->name));
+                $trace->part(new \AiSdk\Streaming\ToolCallDeltaPart($index++, $arguments));
+            }
+        }
+        $trace->part(new \AiSdk\Streaming\FinishPart($response->finishReason, $response->usage, $response->response));
+    }
+
+    /** Both run() and stream() use advance(); only the model operation differs. */
+    private function generateStep(TextModelInterface $model, \AiSdk\Agents\StepContext $step, RunTrace $trace): \AiSdk\Agents\StepOutcome
+    {
+        if (! $trace->isStreaming()) {
+            return new \AiSdk\Agents\StepOutcome($model->generate($step->request), request: $step->request);
+        }
+        $state = new \AiSdk\Streaming\StreamState();
+        $bytes = 0;
+        foreach ($model->stream($step->request) as $part) {
+            $bytes += match (true) {
+                $part instanceof \AiSdk\Streaming\TextDeltaPart, $part instanceof \AiSdk\Streaming\ReasoningDeltaPart => strlen($part->text),
+                $part instanceof \AiSdk\Streaming\ToolCallDeltaPart => strlen($part->argsJson),
+                default => 0,
+            };
+            if ($bytes > 16 * 1024 * 1024 || $state->partCount() >= 65536) {
+                throw new InvalidResponseException('An agent stream step exceeded its size limit.');
+            }
+            $state->record($part);
+            $trace->part($part);
+        }
+        $parts = [new \AiSdk\Responses\Parts\TextPart($state->text())];
+        if ($state->reasoning() !== null) {
+            $parts[] = new \AiSdk\Responses\Parts\ReasoningPart($state->reasoning());
+        }
+        foreach ($state->toolCalls() as $call) {
+            $parts[] = new \AiSdk\Responses\Parts\ToolCallPart($call->id, $call->name, $call->arguments);
+        }
+        $response = new \AiSdk\Responses\TextModelResponse($parts, $state->finishReason(), $state->usage(), providerMetadata: $state->providerMetadata(), response: $state->response());
+
+        return new \AiSdk\Agents\StepOutcome($response, request: $step->request);
     }
 
     /** @param array<int, Tool> $tools */
