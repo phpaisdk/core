@@ -126,3 +126,28 @@ it('rejects expired checkpoints without running tools', function () {
     expect(fn() => $agent->resume($paused->resumeToken, ['a' => true], 'user'))->toThrow(InvalidArgumentException::class);
     expect($executions)->toBe(0);
 });
+
+it('keeps the approval pending when a malformed decision is submitted', function () {
+    $executions = 0;
+    $model = FakeTextModel::scripted([
+        new TextModelResponse([new ToolCallPart('call', 'send', [])], FinishReason::ToolCalls, Usage::empty()),
+        new TextModelResponse([new TextPart('done')], FinishReason::Stop, Usage::empty()),
+    ]);
+    $agent = new Agent($model, tools: [Tool::make('send')->needsApproval()->run(function () use (&$executions) {
+        $executions++;
+    })], store: approvalStore(), signingKey: str_repeat('x', 32));
+    $paused = $agent->run('hi', 'user');
+    expect(fn() => $agent->resume($paused->resumeToken, [], 'user'))->toThrow(InvalidArgumentException::class);
+    $done = $agent->resume($paused->resumeToken, ['call' => true], 'user');
+    expect($done->result->text)->toBe('done')->and($executions)->toBe(1);
+});
+
+it('still reports a result when approval is resolved on the last allowed step', function () {
+    $model = FakeTextModel::scripted([
+        new TextModelResponse([new TextPart('about to act'), new ToolCallPart('call', 'send', [])], FinishReason::ToolCalls, Usage::empty()),
+    ]);
+    $agent = new Agent($model, tools: [Tool::make('send')->needsApproval()->run(fn() => 'sent')], maxSteps: 1, store: approvalStore(), signingKey: str_repeat('x', 32));
+    $paused = $agent->run('hi', 'user');
+    $done = $agent->resume($paused->resumeToken, ['call' => true], 'user');
+    expect($done->stepLimitReached)->toBeTrue()->and($done->result)->not->toBeNull()->and($done->result->text)->toBe('about to act');
+});

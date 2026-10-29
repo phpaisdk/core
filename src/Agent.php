@@ -81,11 +81,31 @@ final readonly class Agent
         sort($ids);
         sort($expected);
         if ($ids !== $expected || array_filter($decisions, static fn($decision): bool => ! is_bool($decision)) !== []) {
-            throw new \InvalidArgumentException('Supply one boolean decision for every approval; invalid submissions consume the token.');
+            // The token was authentic and unexpired, so a malformed submission must not destroy the pending approval.
+            $this->store->put($payload, $checkpoint);
+
+            throw new \InvalidArgumentException('Supply one boolean decision for every approval.');
         }
         $messages = $this->execute($checkpoint->messages, $checkpoint->calls, $decisions);
 
+        if ($checkpoint->remainingSteps < 1) {
+            return new AgentResult($this->lastStep($checkpoint), $messages, $checkpoint->usage, stepLimitReached: true);
+        }
+
         return $this->advance($messages, $checkpoint->remainingSteps, $checkpoint->usage, $scope);
+    }
+
+    /** The step that requested approval, so a budget-exhausted resume still reports a result. */
+    private function lastStep(AgentCheckpoint $checkpoint): TextResult
+    {
+        $assistant = null;
+        foreach ($checkpoint->messages as $message) {
+            if ($message->role === Message::ROLE_ASSISTANT) {
+                $assistant = $message;
+            }
+        }
+
+        return new TextResult($assistant?->text() ?? '', toolCalls: $checkpoint->calls, finishReason: FinishReason::ToolCalls, totalUsage: $checkpoint->usage);
     }
 
     /**
