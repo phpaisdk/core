@@ -4,6 +4,8 @@ Notable changes to `aisdk/core`. Release notes are also published at https://git
 
 ## Unreleased (v0.11.0)
 
+- Validate credential-bearing provider follow-up URLs with `OriginGuard`, including explicit sibling origins restricted to official configurations.
+
 - Implement portable, owner-scoped conversation persistence with `ConversationStore`, paginated messages and steps, reasoning/citations, and bounded in-memory and recording test stores.
 - Discover bounded `SKILL.md` instructions from application-chosen directories with `SkillLoader`, expose them through `Agent::withSkills()`, and read skill text/resources using `LoadSkill` without executing scripts.
 - Stream agents with typed provider parts and run events, the same middleware and tool loop as `run()`, and approval pause/resume via `resumeStream()`.
