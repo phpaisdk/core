@@ -2,7 +2,7 @@
 
 Notable changes to `aisdk/core`. Release notes are also published at https://github.com/phpaisdk/core/releases.
 
-## Unreleased (v0.11.0)
+## v0.11.0 — 2026-10-31
 
 - Validate credential-bearing provider follow-up URLs with `OriginGuard`, including explicit sibling origins restricted to official configurations.
 
