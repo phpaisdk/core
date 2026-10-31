@@ -35,7 +35,9 @@ final readonly class StepOutcome
                 $ids[$part->id] = true;
             }
         }
-        if ($response->usage->inputTokens < 0 || $response->usage->outputTokens < 0 || $response->usage->totalTokens < 0) {
+        $usage = $response->usage;
+        if ($usage->inputTokens < 0 || $usage->outputTokens < 0 || $usage->totalTokens < 0
+            || ($usage->reasoningTokens ?? 0) < 0 || ($usage->cachedInputTokens ?? 0) < 0 || ($usage->cacheWriteInputTokens ?? 0) < 0) {
             throw new InvalidResponseException('Step outcome usage cannot be negative.');
         }
     }

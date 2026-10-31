@@ -91,6 +91,9 @@ it('rejects malformed short circuits with an SDK response exception', function (
     'invalid response contents' => fn() => new StepOutcome(new TextModelResponse([new stdClass()], FinishReason::Stop, Usage::empty())),
     'duplicate ids' => fn() => StepOutcome::fromParts([new ToolCallPart('a', 't', []), new ToolCallPart('a', 't', [])]),
     'negative usage' => fn() => StepOutcome::fromParts([], usage: new Usage(-1, 0)),
+    'negative reasoning usage' => fn() => StepOutcome::fromParts([], usage: new Usage(1, 1, reasoningTokens: -1)),
+    'negative cached usage' => fn() => StepOutcome::fromParts([], usage: new Usage(1, 1, cachedInputTokens: -5)),
+    'negative cache write usage' => fn() => StepOutcome::fromParts([], usage: new Usage(1, 1, cacheWriteInputTokens: -2)),
     'oversized parts' => fn() => StepOutcome::fromParts(array_fill(0, 4097, new TextPart('x'))),
 ]);
 
