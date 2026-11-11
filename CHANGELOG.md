@@ -2,6 +2,10 @@
 
 Notable changes to `aisdk/core`. Release notes are also published at https://github.com/phpaisdk/core/releases.
 
+## v0.11.1 — 2026-11-11
+
+- Expand the supported Pest versions for the core test suite to 3, 4, and 5.
+
 ## v0.11.0 — 2026-10-31
 
 - Validate credential-bearing provider follow-up URLs with `OriginGuard`, including explicit sibling origins restricted to official configurations.
